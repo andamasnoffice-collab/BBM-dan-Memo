@@ -48,6 +48,9 @@
             display: grid;
             grid-template-columns: repeat(7, minmax(0, 1fr));
         }
+        .smooth-render {
+            contain: content;
+        }
         @media print {
             .no-print { display: none !important; }
             .print-only { display: block !important; }
@@ -163,7 +166,6 @@
                 <span>Jadwal & Agenda Dinas</span>
             </button>
 
-            <!-- ADMIN-ONLY TABS -->
             <button v-if="isAdmin" @click="currentTab = 'requests'" :class="currentTab === 'requests' ? 'bg-sky-600 text-white font-bold shadow-md' : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-200'" class="px-3 sm:px-3.5 py-1.5 rounded-xl text-[11px] sm:text-xs transition flex items-center gap-1.5 sm:gap-2 cursor-pointer shrink-0">
                 <i class="fa-solid fa-list-check"></i>
                 <span>Daftar Peminjaman</span>
@@ -183,7 +185,6 @@
 
         <main class="flex-1 p-3 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto space-y-4 sm:space-y-6">
 
-            <!-- STATS COUNTERS -->
             <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-2.5 sm:gap-4">
                 <div class="bg-slate-900 p-3 sm:p-4 rounded-xl sm:rounded-2xl border border-slate-800 flex items-center gap-2.5 sm:gap-3">
                     <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-sky-500/10 text-sky-400 flex items-center justify-center font-bold text-base sm:text-lg border border-sky-500/20 shrink-0">
@@ -236,7 +237,8 @@
                 </div>
             </div>
 
-            <section v-if="currentTab === 'calendar'" class="space-y-4">
+            <!-- TAB 1: KALENDER BULANAN -->
+            <section v-if="currentTab === 'calendar'" class="space-y-4 smooth-render">
                 <div class="bg-slate-900 p-4 rounded-2xl border border-slate-800 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 shadow-xl">
                     <div class="flex items-center gap-3">
                         <div class="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center font-bold text-lg">
@@ -314,20 +316,20 @@
                                 </div>
                             </div>
 
-                            <!-- MULTI-DAY SPANNING EVENTS OVERLAY LAYER (UP TO 6 COMPACT SLOTS) -->
+                            <!-- MULTI-DAY SPANNING EVENTS OVERLAY LAYER (PRE-COMPUTED FAST RENDER) -->
                             <div class="absolute top-5 sm:top-7 left-0 right-0 bottom-0 grid grid-cols-7 gap-y-[1px] sm:gap-y-[2px] px-0.5 pointer-events-none z-20">
                                 <div v-for="item in week.visibleEvents" :key="item.b.id + '-' + week.weekIndex"
                                      @click.stop="openTicketModal(item.b)"
                                      :style="{ gridColumn: (item.startIndex + 1) + ' / span ' + item.span, gridRow: item.slot }"
                                      :class="[
-                                        getCalBadgeStyle(item.b),
+                                        item.badgeStyle,
                                         item.isStartOfBooking ? 'rounded-l-lg pl-1.5 sm:pl-2' : 'rounded-l-none border-l-0 pl-1',
                                         item.isEndOfBooking ? 'rounded-r-lg pr-1.5 sm:pr-2' : 'rounded-r-none border-r-0 pr-1',
                                         'pointer-events-auto h-[18px] sm:h-[21px] text-[8px] sm:text-[10px] font-bold leading-none truncate shadow-md transition hover:brightness-125 cursor-pointer flex items-center gap-1 z-20 border border-slate-950/40'
                                      ]"
-                                     :title="getCalEventLabel(item.b)">
+                                     :title="item.label">
                                     <i v-if="item.isStartOfBooking" class="fa-solid fa-car text-[8px] sm:text-[9px] opacity-80 shrink-0"></i>
-                                    <span class="truncate">{{ getCalEventLabel(item.b) }}</span>
+                                    <span class="truncate">{{ item.label }}</span>
                                 </div>
                             </div>
 
@@ -336,6 +338,7 @@
                 </div>
             </section>
 
+            <!-- TAB 2: INSPECTOR AVAILABILITY -->
             <section v-if="currentTab === 'inspector'" class="space-y-4">
                 <div class="bg-slate-900 p-4 rounded-2xl border border-slate-800 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 shadow-xl">
                     <div class="flex items-center gap-3">
@@ -364,7 +367,6 @@
                 </div>
 
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    <!-- SEDANG BERTUGAS / ON DUTY -->
                     <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3 shadow-xl">
                         <h3 class="font-extrabold text-sm text-amber-300 flex items-center justify-between border-b border-slate-800 pb-2">
                             <span><i class="fa-solid fa-route text-rose-400 mr-2"></i>Sedang Bertugas pada Tanggal Ini ({{ inspectorData.dutyBookings.length }})</span>
@@ -393,14 +395,12 @@
                         </div>
                     </div>
 
-                    <!-- STANDBY / READY -->
                     <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-4 shadow-xl">
                         <h3 class="font-extrabold text-sm text-emerald-400 border-b border-slate-800 pb-2 flex justify-between items-center">
                             <span><i class="fa-solid fa-circle-check mr-2"></i>Standby Ready Tanggal Ini</span>
                             <span class="text-[10px] text-slate-400 font-normal">Bebas Tugas</span>
                         </h3>
 
-                        <!-- MOBIL READY -->
                         <div class="space-y-2">
                             <p class="text-xs font-mono font-bold text-sky-400 uppercase flex items-center justify-between">
                                 <span><i class="fa-solid fa-car mr-1.5"></i>Mobil Ready ({{ inspectorData.readyVehicles.length }})</span>
@@ -419,7 +419,6 @@
                             <p v-else class="text-xs text-slate-500 text-center py-4 bg-slate-950/50 rounded-xl border border-slate-800/50">Semua armada sedang bertugas / OFF pada tanggal ini.</p>
                         </div>
 
-                        <!-- DRIVER STANDBY -->
                         <div class="space-y-2 pt-3 border-t border-slate-800">
                             <p class="text-xs font-mono font-bold text-indigo-400 uppercase flex items-center justify-between">
                                 <span><i class="fa-solid fa-user-check mr-1.5"></i>Driver Standby ({{ inspectorData.readyDrivers.length }})</span>
@@ -439,6 +438,7 @@
                 </div>
             </section>
 
+            <!-- TAB 3: SCHEDULE TIMELINE -->
             <section v-if="currentTab === 'schedule'" class="space-y-4">
                 <div class="bg-slate-900 p-4 rounded-xl border border-slate-800 flex justify-between items-center">
                     <h2 class="font-extrabold text-base text-white">Jadwal Perjalanan Dinas Aktif</h2>
@@ -465,6 +465,7 @@
                 <div v-else class="bg-slate-900 border border-slate-800 rounded-2xl p-8 text-center text-slate-500 text-xs">Tidak ada jadwal perjalanan dinas pada tanggal ini.</div>
             </section>
 
+            <!-- TAB 4: REQUESTS LIST (ADMIN ONLY) -->
             <section v-if="currentTab === 'requests' && isAdmin" class="space-y-4">
                 <div class="bg-slate-900 p-4 rounded-xl border border-slate-800 flex flex-col md:flex-row justify-between items-stretch md:items-center gap-3">
                     <h2 class="font-extrabold text-base text-white">Daftar Pengajuan Peminjaman Kendaraan Dinas</h2>
@@ -513,8 +514,14 @@
                                         <div class="text-slate-500 text-[10px]">s/d {{ formatDateTimeWib(b.endDate) }}</div>
                                     </td>
                                     <td class="p-3">
-                                        <div class="font-bold font-mono text-sky-400">{{ getVehiclePlate(b.vehicleId) }}</div>
-                                        <div class="text-[10px] text-slate-400">Driver: {{ getDriverName(b.driverId) }}</div>
+                                        <div class="font-bold font-mono text-sky-400 flex items-center gap-1">
+                                            <span>{{ getVehiclePlate(b.vehicleId) }}</span>
+                                            <span v-if="isVehicleBusy(b.vehicleId, b.startDate, b.endDate, b.id)" class="px-1 bg-rose-950 text-rose-400 border border-rose-800 text-[9px] rounded font-bold" title="Bentrok Jadwal">⚠️</span>
+                                        </div>
+                                        <div class="text-[10px] text-slate-400 flex items-center gap-1">
+                                            <span>Driver: {{ getDriverName(b.driverId) }}</span>
+                                            <span v-if="isDriverBusy(b.driverId, b.startDate, b.endDate, b.id)" class="px-1 bg-rose-950 text-rose-400 border border-rose-800 text-[9px] rounded font-bold" title="Bentrok Driver">⚠️</span>
+                                        </div>
                                     </td>
                                     <td class="p-3 text-center">
                                         <span :class="getStatusBadgeClass(b.status)" class="px-2.5 py-1 rounded-full text-[10px] font-black font-mono">{{ getStatusLabel(b.status) }}</span>
@@ -535,6 +542,7 @@
                 </div>
             </section>
 
+            <!-- TAB 5: FLEET & DRIVER AVAILABILITY (ADMIN ONLY) -->
             <section v-if="currentTab === 'fleet' && isAdmin" class="space-y-4">
                 <div class="bg-slate-900 p-4 rounded-xl border border-slate-800 flex justify-between items-center flex-wrap gap-2">
                     <h2 class="font-extrabold text-base text-white"><i class="fa-solid fa-car-side text-sky-400 mr-2"></i>Pengaturan Ketersediaan Armada & Driver</h2>
@@ -545,7 +553,6 @@
                 </div>
 
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    <!-- FLEET LIST -->
                     <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3 shadow-xl">
                         <h3 class="font-extrabold text-sm text-sky-400 border-b border-slate-800 pb-2 flex justify-between items-center">
                             <span><i class="fa-solid fa-car mr-2"></i>Status Armada Mobil Dinas ({{ (vehicles || []).length }})</span>
@@ -588,7 +595,6 @@
                         </div>
                     </div>
 
-                    <!-- DRIVER LIST -->
                     <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3 shadow-xl">
                         <h3 class="font-extrabold text-sm text-indigo-400 border-b border-slate-800 pb-2"><i class="fa-solid fa-id-card mr-2"></i>Status Driver / Sopir ({{ (drivers || []).length }})</h3>
                         <div class="space-y-2 max-h-96 overflow-y-auto pr-1">
@@ -611,6 +617,7 @@
                 </div>
             </section>
 
+            <!-- TAB 6: RECAP & WORKLOAD (ADMIN ONLY) -->
             <section v-if="currentTab === 'recap' && isAdmin" class="space-y-4">
                 <div class="bg-slate-900 p-4 rounded-xl border border-slate-800 flex justify-between items-center flex-wrap gap-2">
                     <div>
@@ -669,6 +676,7 @@
 
         </main>
 
+        <!-- MOBILE BOTTOM NAVIGATION BAR -->
         <nav class="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-slate-900/95 backdrop-blur-md border-t border-slate-800 px-2 py-1.5 flex items-center justify-around no-print shadow-2xl">
             <button @click="currentTab = 'calendar'" :class="currentTab === 'calendar' ? 'text-sky-400 font-bold' : 'text-slate-400'" class="flex flex-col items-center gap-0.5 p-1 text-[10px] cursor-pointer">
                 <i class="fa-solid fa-calendar-days text-base"></i>
@@ -697,8 +705,9 @@
             </button>
         </nav>
 
+        <!-- ALL MODALS AREA -->
 
-        <!-- MODAL: DETAIL RINCIAN TUGAS DRIVER -->
+        <!-- MODAL 1: DETAIL RINCIAN TUGAS DRIVER -->
         <div v-if="activeDriverDetailModal && selectedDriverDetail" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
             <div class="bg-slate-900 border border-slate-800 w-full max-w-3xl rounded-2xl p-5 sm:p-6 shadow-2xl space-y-4 my-auto">
                 <div class="flex items-center justify-between border-b border-slate-800 pb-3">
@@ -718,7 +727,6 @@
                     <button @click="activeDriverDetailModal = false" class="text-slate-400 hover:text-white cursor-pointer"><i class="fa-solid fa-xmark text-lg"></i></button>
                 </div>
 
-                <!-- STATS SUMMARY PILLS IN MODAL -->
                 <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs font-mono">
                     <div class="bg-slate-950 p-2.5 rounded-xl border border-slate-800">
                         <span class="text-slate-500 block text-[10px]">Total Hari Bertugas</span>
@@ -738,7 +746,6 @@
                     </div>
                 </div>
 
-                <!-- TRIP LIST TABLE IN MODAL -->
                 <div class="space-y-2">
                     <p class="text-xs font-bold text-slate-300 flex items-center justify-between">
                         <span>Daftar Agenda Penugasan ({{ selectedDriverDetail.driverBookings.length }} Trip)</span>
@@ -792,9 +799,6 @@
                             </tbody>
                         </table>
                     </div>
-                    <p v-else class="text-xs text-slate-500 text-center py-6 bg-slate-950 rounded-xl border border-slate-800">
-                        Tidak ada agenda penugasan dinas untuk driver ini pada bulan {{ getMonthName(recapMonth) }} {{ recapYear }}.
-                    </p>
                 </div>
 
                 <div class="flex justify-end pt-3 border-t border-slate-800">
@@ -805,7 +809,7 @@
             </div>
         </div>
 
-        <!-- MODAL: KOTAK TANGGAL DIKLIK -->
+        <!-- MODAL 2: KOTAK TANGGAL DIKLIK -->
         <div v-if="activeDayClickModal && selectedDayData" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
             <div class="bg-slate-900 border border-slate-800 w-full max-w-md rounded-2xl p-5 sm:p-6 shadow-2xl space-y-4">
                 <div class="flex items-center justify-between border-b border-slate-800 pb-3">
@@ -847,7 +851,7 @@
             </div>
         </div>
 
-        <!-- MODAL: AJUKAN / EDIT PEMINJAMAN -->
+        <!-- MODAL 3: AJUKAN / EDIT PEMINJAMAN -->
         <div v-if="activeBookingModal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto">
             <div class="bg-slate-900 border-t sm:border border-slate-800 w-full max-w-xl rounded-t-2xl sm:rounded-2xl p-5 sm:p-6 shadow-2xl space-y-4 my-auto">
                 <div class="flex items-center justify-between border-b border-slate-800 pb-3">
@@ -858,7 +862,6 @@
                     <button @click="activeBookingModal = false" class="text-slate-400 hover:text-white p-1 cursor-pointer"><i class="fa-solid fa-xmark"></i></button>
                 </div>
 
-                <!-- GEMINI AI EXTRACTION BANNER -->
                 <div class="bg-purple-950/60 border border-purple-800/80 rounded-xl p-3 flex items-center justify-between gap-2">
                     <div class="flex items-center gap-2">
                         <i class="fa-solid fa-wand-magic-sparkles text-purple-400 text-lg"></i>
@@ -903,7 +906,6 @@
                         </div>
                     </div>
 
-                    <!-- REALTIME LOCATION SEARCH WITH AUTO-KM -->
                     <div class="relative">
                         <label class="block font-bold text-amber-300 mb-1">Lokasi Tujuan Dinas (Database Online & Instant Jawa-Bali) *</label>
                         <div class="relative">
@@ -911,7 +913,6 @@
                             <i v-if="isSearchingLocation" class="fa-solid fa-spinner fa-spin absolute right-3 top-1/2 -translate-y-1/2 text-sky-400"></i>
                         </div>
 
-                        <!-- AUTOCOMPLETE SUGGESTIONS DROPDOWN WITH KM BADGES -->
                         <div v-if="destinationSuggestions.length > 0" class="absolute z-50 left-0 right-0 top-full mt-1 bg-slate-900 border border-slate-800 rounded-xl shadow-2xl max-h-56 overflow-y-auto divide-y divide-slate-800/80">
                             <div v-for="(s, idx) in destinationSuggestions" :key="idx" @click="selectLocationSuggestion(s)" class="p-2.5 hover:bg-slate-800 cursor-pointer text-xs flex justify-between items-center transition">
                                 <div class="min-w-0 pr-2">
@@ -953,7 +954,9 @@
                             <label class="block font-bold text-slate-300 mb-1">Pilihan Mobil Dinas (Hanya Yang Aktif)</label>
                             <select v-model="bookingForm.vehicleId" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white font-bold focus:border-sky-500 focus:outline-none">
                                 <option value="">-- Serahkan Alokasi ke Admin --</option>
-                                <option v-for="car in activeVehicles" :key="car.id" :value="car.id">{{ car.plate }} - {{ car.model }}</option>
+                                <option v-for="car in activeVehicles" :key="car.id" :value="car.id">
+                                    {{ car.plate }} - {{ car.model }} {{ isVehicleBusy(car.id, bookingForm.startDate, bookingForm.endDate, editingBookingId) ? '⚠️ (Bentrok Jadwal)' : '✅ (Siap)' }}
+                                </option>
                             </select>
                         </div>
 
@@ -961,7 +964,9 @@
                             <label class="block font-bold text-slate-300 mb-1">Pilihan Driver (Hanya Yang Standby)</label>
                             <select v-model="bookingForm.driverId" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white font-bold focus:border-sky-500 focus:outline-none">
                                 <option value="">-- Serahkan Alokasi ke Admin --</option>
-                                <option v-for="d in activeDrivers" :key="d.id" :value="d.id">{{ d.name }}</option>
+                                <option v-for="d in activeDrivers" :key="d.id" :value="d.id">
+                                    {{ d.name }} {{ isDriverBusy(d.id, bookingForm.startDate, bookingForm.endDate, editingBookingId) ? '⚠️ (Bentrok Jadwal)' : '✅ (Standby)' }}
+                                </option>
                             </select>
                         </div>
                     </div>
@@ -985,7 +990,61 @@
             </div>
         </div>
 
-        <!-- MODAL: GOOGLE CALENDAR SETTINGS -->
+        <!-- MODAL 4: APPROVAL ADMIN -->
+        <div v-if="activeApprovalModal && selectedBooking" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+            <div class="bg-slate-900 border border-slate-800 w-full max-w-lg rounded-2xl p-5 sm:p-6 shadow-2xl space-y-4">
+                <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                    <div class="flex items-center gap-2">
+                        <i class="fa-solid fa-circle-check text-emerald-400 text-xl"></i>
+                        <h3 class="font-extrabold text-sm sm:text-base text-white">Approval Pengajuan Dinas</h3>
+                    </div>
+                    <button @click="activeApprovalModal = false" class="text-slate-400 hover:text-white cursor-pointer"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+
+                <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-1.5 text-xs">
+                    <p class="text-white"><strong>Pemohon:</strong> {{ selectedBooking.applicantName }} ({{ selectedBooking.unit }})</p>
+                    <p class="text-amber-300"><strong>Tujuan:</strong> {{ selectedBooking.destination }}</p>
+                    <p class="text-slate-400"><strong>Jadwal:</strong> {{ formatDateTimeWib(selectedBooking.startDate) }} s/d {{ formatDateTimeWib(selectedBooking.endDate) }}</p>
+                </div>
+
+                <form @submit.prevent="saveApproval" class="space-y-3 text-xs">
+                    <div>
+                        <label class="block font-bold text-slate-300 mb-1">Alokasi Mobil Dinas</label>
+                        <select v-model="bookingForm.vehicleId" required class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white font-bold">
+                            <option value="">-- Pilih Mobil --</option>
+                            <option v-for="car in activeVehicles" :key="car.id" :value="car.id">
+                                {{ car.plate }} - {{ car.model }}
+                            </option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block font-bold text-slate-300 mb-1">Alokasi Driver / Sopir</label>
+                        <select v-model="bookingForm.driverId" required class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white font-bold">
+                            <option value="">-- Pilih Driver --</option>
+                            <option v-for="d in activeDrivers" :key="d.id" :value="d.id">
+                                {{ d.name }} ({{ d.phone || '-' }})
+                            </option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block font-bold text-slate-300 mb-1">Keputusan Status Approval</label>
+                        <select v-model="bookingForm.status" required class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white font-bold">
+                            <option value="APPROVED">🟢 APPROVED (Disetujui)</option>
+                            <option value="REJECTED">🔴 REJECTED (Ditolak)</option>
+                        </select>
+                    </div>
+
+                    <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
+                        <button type="button" @click="activeApprovalModal = false" class="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl font-bold cursor-pointer">Batal</button>
+                        <button type="submit" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold shadow-lg shadow-emerald-600/20 cursor-pointer">Simpan Status</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- MODAL 5: GOOGLE CALENDAR SETTINGS -->
         <div v-if="activeGCalModal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
             <div class="bg-slate-900 border border-slate-800 w-full max-w-lg rounded-2xl p-5 sm:p-6 shadow-2xl space-y-4 my-auto">
                 <div class="flex items-center justify-between border-b border-slate-800 pb-3">
@@ -1002,8 +1061,8 @@
                             <span>Sinkronisasi Otomatis Cloud Terintegrasi</span>
                         </p>
                         <p class="text-[11px] text-slate-300 leading-relaxed">
-                            • <strong>Auto Sync Cloud:</strong> URL Webhook ini tersimpan otomatis di Firebase Cloud Database sehingga berlaku untuk seluruh pengguna sistem.<br>
-                            • <strong>2-Way Automatic:</strong> Aplikasi & GCal bertukar data otomatis setiap 60 detik tanpa tindakan pengguna.
+                            • <strong>Auto Sync Cloud:</strong> URL Webhook ini tersimpan otomatis di Firebase Cloud Database.<br>
+                            • <strong>2-Way Automatic:</strong> Aplikasi & GCal bertukar data otomatis setiap 60 detik.
                         </p>
                     </div>
 
@@ -1068,7 +1127,251 @@ function handleReq(e){
             </div>
         </div>
 
-        <!-- MODAL: ADMIN LOGIN -->
+        <!-- MODAL 6: WA BOT SETTINGS -->
+        <div v-if="activeWaModal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+            <div class="bg-slate-900 border border-slate-800 w-full max-w-md rounded-2xl p-5 sm:p-6 shadow-2xl space-y-4">
+                <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                    <div class="flex items-center gap-2">
+                        <i class="fa-brands fa-whatsapp text-emerald-400 text-xl"></i>
+                        <h3 class="font-extrabold text-sm sm:text-base text-white">Pengaturan WhatsApp Bot Gateway</h3>
+                    </div>
+                    <button @click="activeWaModal = false" class="text-slate-400 hover:text-white cursor-pointer"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+
+                <div class="space-y-3 text-xs">
+                    <div>
+                        <label class="block font-bold text-slate-300 mb-1">Pilih Provider WA Gateway</label>
+                        <select v-model="waGatewayProvider" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white font-bold">
+                            <option value="fonnte">Fonnte (fonnte.com)</option>
+                            <option value="wablas">Wablas (wablas.com)</option>
+                            <option value="woowa">WooWa Gateway</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block font-bold text-slate-300 mb-1">API Token WA Gateway</label>
+                        <input type="text" v-model="waGatewayToken" placeholder="Masukkan Token API WA..." class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white font-mono focus:border-emerald-500 focus:outline-none">
+                    </div>
+
+                    <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
+                        <button type="button" @click="activeWaModal = false" class="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl font-bold cursor-pointer">Batal</button>
+                        <button type="button" @click="saveWaSettings" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold shadow cursor-pointer">Simpan Token</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL 7: GEMINI AI EXTRACTION MODAL -->
+        <div v-if="activeGeminiExtractModal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+            <div class="bg-slate-900 border border-slate-800 w-full max-w-lg rounded-2xl p-5 sm:p-6 shadow-2xl space-y-4 my-auto">
+                <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                    <div class="flex items-center gap-2">
+                        <i class="fa-solid fa-wand-magic-sparkles text-purple-400 text-xl"></i>
+                        <h3 class="font-extrabold text-sm sm:text-base text-white">Ekstraksi Surat/Pesan Otomatis (Gemini AI)</h3>
+                    </div>
+                    <button @click="activeGeminiExtractModal = false" class="text-slate-400 hover:text-white cursor-pointer"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+
+                <div class="space-y-3 text-xs">
+                    <div>
+                        <label class="block font-bold text-slate-300 mb-1">1. Upload Gambar Screenshot Memo / Surat Dinas (Opsional)</label>
+                        <input type="file" @change="handleGeminiImageUpload" accept="image/*" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2 text-slate-300 file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-purple-900 file:text-purple-200 hover:file:bg-purple-800">
+                    </div>
+
+                    <div>
+                        <label class="block font-bold text-slate-300 mb-1">2. Atau Paste Teks Surat / Pesan WA</label>
+                        <textarea v-model="geminiInputText" rows="4" placeholder="Contoh: Permohonan pinjam kendaraan dinas untuk Dekan FT ke Ditjen Diktiragaga Jakarta tgl 20-22 Agustus 2026..." class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white focus:border-purple-500 focus:outline-none"></textarea>
+                    </div>
+
+                    <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
+                        <button type="button" @click="activeGeminiExtractModal = false" class="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl font-bold cursor-pointer">Batal</button>
+                        <button type="button" @click="processGeminiExtraction" :disabled="isGeminiProcessing" class="px-5 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-xl font-bold shadow-lg shadow-purple-600/20 flex items-center gap-2 cursor-pointer">
+                            <i v-if="isGeminiProcessing" class="fa-solid fa-spinner fa-spin"></i>
+                            <span>{{ isGeminiProcessing ? 'Memproses AI...' : 'Jalankan Ekstraksi' }}</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL 8: GEMINI API KEY SETTINGS -->
+        <div v-if="activeGeminiSettingsModal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+            <div class="bg-slate-900 border border-slate-800 w-full max-w-md rounded-2xl p-5 sm:p-6 shadow-2xl space-y-4">
+                <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                    <div class="flex items-center gap-2">
+                        <i class="fa-solid fa-wand-magic-sparkles text-purple-400 text-xl"></i>
+                        <h3 class="font-extrabold text-sm sm:text-base text-white">Pengaturan Gemini AI Key</h3>
+                    </div>
+                    <button @click="activeGeminiSettingsModal = false" class="text-slate-400 hover:text-white cursor-pointer"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+
+                <div class="space-y-3 text-xs">
+                    <div>
+                        <label class="block font-bold text-slate-300 mb-1">Google Gemini API Key</label>
+                        <input type="text" v-model="geminiApiKey" placeholder="AIzaSy..." class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white font-mono focus:border-purple-500 focus:outline-none">
+                    </div>
+
+                    <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
+                        <button type="button" @click="activeGeminiSettingsModal = false" class="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl font-bold cursor-pointer">Batal</button>
+                        <button type="button" @click="saveGeminiSettings" class="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-xl font-bold shadow cursor-pointer">Simpan API Key</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL 9: CLOUD DATABASE STATUS -->
+        <div v-if="activeCloudModal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+            <div class="bg-slate-900 border border-slate-800 w-full max-w-md rounded-2xl p-5 sm:p-6 shadow-2xl space-y-4">
+                <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                    <div class="flex items-center gap-2">
+                        <i class="fa-solid fa-cloud-arrow-up text-emerald-400 text-xl"></i>
+                        <h3 class="font-extrabold text-sm sm:text-base text-white">Status Realtime Database Cloud</h3>
+                    </div>
+                    <button @click="activeCloudModal = false" class="text-slate-400 hover:text-white cursor-pointer"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+
+                <div class="space-y-3 text-xs">
+                    <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-2">
+                        <div class="flex justify-between items-center">
+                            <span class="text-slate-400">Koneksi Firebase:</span>
+                            <span class="font-bold text-emerald-400 font-mono">TERHUBUNG (Realtime)</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-slate-400">App ID Workspace:</span>
+                            <span class="font-bold text-sky-400 font-mono">{{ firebaseAppId }}</span>
+                        </div>
+                    </div>
+
+                    <div class="flex justify-end pt-2 border-t border-slate-800">
+                        <button type="button" @click="activeCloudModal = false" class="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl font-bold cursor-pointer">Tutup</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL 10: CHANGE PASSWORD ADMIN -->
+        <div v-if="activePasswordModal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+            <div class="bg-slate-900 border border-slate-800 w-full max-w-sm rounded-2xl p-5 sm:p-6 shadow-2xl space-y-4">
+                <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                    <div class="flex items-center gap-2">
+                        <i class="fa-solid fa-key text-amber-400 text-lg"></i>
+                        <h3 class="font-extrabold text-sm sm:text-base text-white">Ubah Password Admin</h3>
+                    </div>
+                    <button @click="activePasswordModal = false" class="text-slate-400 hover:text-white cursor-pointer"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+
+                <form @submit.prevent="changeAdminPassword" class="space-y-3 text-xs">
+                    <div>
+                        <label class="block font-bold text-slate-300 mb-1">Password Saat Ini</label>
+                        <input type="password" v-model="pwdForm.currentPwd" required class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white focus:border-amber-500 focus:outline-none">
+                    </div>
+
+                    <div>
+                        <label class="block font-bold text-slate-300 mb-1">Password Baru</label>
+                        <input type="password" v-model="pwdForm.newPwd" required class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white focus:border-amber-500 focus:outline-none">
+                    </div>
+
+                    <div>
+                        <label class="block font-bold text-slate-300 mb-1">Konfirmasi Password Baru</label>
+                        <input type="password" v-model="pwdForm.confirmPwd" required class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white focus:border-amber-500 focus:outline-none">
+                    </div>
+
+                    <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
+                        <button type="button" @click="activePasswordModal = false" class="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl font-bold cursor-pointer">Batal</button>
+                        <button type="submit" class="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-xl font-bold shadow cursor-pointer">Simpan Password</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- MODAL 11: IMPORT EXCEL -->
+        <div v-if="activeImportBookingModal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+            <div class="bg-slate-900 border border-slate-800 w-full max-w-md rounded-2xl p-5 sm:p-6 shadow-2xl space-y-4">
+                <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                    <div class="flex items-center gap-2">
+                        <i class="fa-solid fa-file-excel text-emerald-400 text-xl"></i>
+                        <h3 class="font-extrabold text-sm sm:text-base text-white">Import Data Penjadwalan Excel</h3>
+                    </div>
+                    <button @click="activeImportBookingModal = false" class="text-slate-400 hover:text-white cursor-pointer"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+
+                <div class="space-y-3 text-xs">
+                    <p class="text-slate-400">Pilih file spreadsheet (.xlsx/.xls) dengan kolom: Pemohon, Unit, NoHP, Maksud, Tujuan, TglMulai, TglSelesai.</p>
+                    <input type="file" @change="importBookingsFromExcel" accept=".xlsx, .xls" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2 text-slate-300 file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-emerald-900 file:text-emerald-200 hover:file:bg-emerald-800">
+
+                    <div class="flex justify-end pt-2 border-t border-slate-800">
+                        <button type="button" @click="activeImportBookingModal = false" class="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl font-bold cursor-pointer">Batal</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL 12: ADD / EDIT VEHICLE -->
+        <div v-if="activeVehicleModal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+            <div class="bg-slate-900 border border-slate-800 w-full max-w-md rounded-2xl p-5 sm:p-6 shadow-2xl space-y-4">
+                <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                    <div class="flex items-center gap-2">
+                        <i class="fa-solid fa-car text-sky-400 text-xl"></i>
+                        <h3 class="font-extrabold text-sm sm:text-base text-white">{{ vehicleForm.id ? 'Edit Data Mobil Dinas' : 'Tambah Mobil Dinas Baru' }}</h3>
+                    </div>
+                    <button @click="activeVehicleModal = false" class="text-slate-400 hover:text-white cursor-pointer"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+
+                <form @submit.prevent="saveVehicle" class="space-y-3 text-xs">
+                    <div>
+                        <label class="block font-bold text-slate-300 mb-1">Plat Nomor Kendaraan *</label>
+                        <input type="text" v-model="vehicleForm.plate" required placeholder="Contoh: AD 1001 ZA" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white uppercase font-mono font-bold focus:border-sky-500 focus:outline-none">
+                    </div>
+
+                    <div>
+                        <label class="block font-bold text-slate-300 mb-1">Tipe / Model Mobil *</label>
+                        <input type="text" v-model="vehicleForm.model" required placeholder="Contoh: Toyota Innova Zenix" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white font-bold focus:border-sky-500 focus:outline-none">
+                    </div>
+
+                    <div>
+                        <label class="block font-bold text-slate-300 mb-1">Driver Default (Opsional)</label>
+                        <input type="text" v-model="vehicleForm.driver" placeholder="Contoh: Pak Budi" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white focus:border-sky-500 focus:outline-none">
+                    </div>
+
+                    <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
+                        <button type="button" @click="activeVehicleModal = false" class="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl font-bold cursor-pointer">Batal</button>
+                        <button type="submit" class="px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-xl font-bold shadow cursor-pointer">Simpan Armada</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- MODAL 13: ADD / EDIT DRIVER -->
+        <div v-if="activeDriverModal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+            <div class="bg-slate-900 border border-slate-800 w-full max-w-md rounded-2xl p-5 sm:p-6 shadow-2xl space-y-4">
+                <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                    <div class="flex items-center gap-2">
+                        <i class="fa-solid fa-user-plus text-indigo-400 text-xl"></i>
+                        <h3 class="font-extrabold text-sm sm:text-base text-white">{{ driverForm.id ? 'Edit Data Driver' : 'Tambah Driver Baru' }}</h3>
+                    </div>
+                    <button @click="activeDriverModal = false" class="text-slate-400 hover:text-white cursor-pointer"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+
+                <form @submit.prevent="saveDriver" class="space-y-3 text-xs">
+                    <div>
+                        <label class="block font-bold text-slate-300 mb-1">Nama Lengkap Driver *</label>
+                        <input type="text" v-model="driverForm.name" required placeholder="Contoh: Pak Budi Hartono" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white font-bold focus:border-indigo-500 focus:outline-none">
+                    </div>
+
+                    <div>
+                        <label class="block font-bold text-slate-300 mb-1">Nomor WhatsApp Driver</label>
+                        <input type="text" v-model="driverForm.phone" placeholder="08123456789" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white font-mono focus:border-indigo-500 focus:outline-none">
+                    </div>
+
+                    <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
+                        <button type="button" @click="activeDriverModal = false" class="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl font-bold cursor-pointer">Batal</button>
+                        <button type="submit" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold shadow cursor-pointer">Simpan Driver</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- MODAL 14: ADMIN LOGIN -->
         <div v-if="activeAdminModal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
             <div class="bg-slate-900 border border-slate-800 w-full max-w-sm rounded-2xl p-5 sm:p-6 shadow-2xl space-y-4">
                 <div class="text-center space-y-1">
@@ -1090,7 +1393,7 @@ function handleReq(e){
             </div>
         </div>
 
-        <!-- MODAL: TICKET DINAS -->
+        <!-- MODAL 15: TICKET DINAS PRINT/VIEW -->
         <div v-if="activeTicketModal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
             <div class="bg-white text-slate-900 border border-slate-300 w-full max-w-xl rounded-2xl p-6 shadow-2xl space-y-4 my-auto font-sans">
                 <div class="flex items-center justify-between border-b pb-3 no-print">
@@ -1142,7 +1445,7 @@ function handleReq(e){
             </div>
         </div>
 
-        <!-- MODAL: DELETE CONFIRMATION -->
+        <!-- MODAL 16: DELETE CONFIRMATION -->
         <div v-if="activeDeleteModal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
             <div class="bg-slate-900 border-t sm:border border-slate-800 w-full max-w-sm rounded-t-2xl sm:rounded-2xl p-5 sm:p-6 shadow-2xl space-y-4 text-center">
                 <div class="w-12 h-12 bg-rose-500/10 text-rose-400 rounded-full flex items-center justify-center mx-auto text-xl border border-rose-500/20"><i class="fa-solid fa-triangle-exclamation"></i></div>
@@ -1165,6 +1468,7 @@ function handleReq(e){
 
     </div>
 
+    <!-- VUE 3 & FIREBASE MODULE SCRIPT -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
@@ -1221,7 +1525,6 @@ function handleReq(e){
                     recapYear: now.getFullYear(),
 
                     presetLocations: [
-                        // KAMPUS & SOLO RAYA (DALAM KOTA <= 40 KM)
                         { title: 'Kampus UNS Kentingan Surakarta', subtitle: 'Jl. Ir. Sutami No.36A, Surakarta', lat: -7.5589, lon: 110.8562, km: 5 },
                         { title: 'Gedung Mangkunegaran (Surakarta)', subtitle: 'Kec. Banjarsari, Kota Surakarta', lat: -7.5672, lon: 110.8236, km: 8 },
                         { title: 'Balai Kota Surakarta', subtitle: 'Jl. Jend. Sudirman No.2, Pasar Kliwon, Surakarta', lat: -7.5701, lon: 110.8291, km: 7 },
@@ -1233,8 +1536,6 @@ function handleReq(e){
                         { title: 'Kabupaten Sragen (Pusat Kota)', subtitle: 'Pusat Pemerintahan Kab. Sragen', lat: -7.4278, lon: 111.0219, km: 32 },
                         { title: 'Kabupaten Klaten (Pusat Kota)', subtitle: 'Pusat Pemerintahan Kab. Klaten', lat: -7.7058, lon: 110.6042, km: 35 },
                         { title: 'Kabupaten Wonogiri (Pusat Kota)', subtitle: 'Pusat Pemerintahan Kab. Wonogiri', lat: -7.8167, lon: 110.9250, km: 38 },
-
-                        // JATENG & DIY (LUAR KOTA > 40 KM)
                         { title: 'Kota Yogyakarta / Malioboro', subtitle: 'Kota Yogyakarta, D.I. Yogyakarta', lat: -7.7956, lon: 110.3695, km: 62 },
                         { title: 'Universitas Gadjah Mada (UGM)', subtitle: 'Bulaksumur, Caturtunggal, Sleman, DIY', lat: -7.7702, lon: 110.3778, km: 60 },
                         { title: 'Universitas Negeri Yogyakarta (UNY)', subtitle: 'Depok, Sleman, D.I. Yogyakarta', lat: -7.7744, lon: 110.3861, km: 58 },
@@ -1244,8 +1545,6 @@ function handleReq(e){
                         { title: 'Candi Borobudur (Magelang)', subtitle: 'Borobudur, Kabupaten Magelang', lat: -7.6079, lon: 110.2038, km: 85 },
                         { title: 'Kota Madiun', subtitle: 'Pusat Kota Madiun, Jawa Timur', lat: -7.6298, lon: 111.5239, km: 98 },
                         { title: 'Kota Purwokerto (Banyumas)', subtitle: 'Kabupaten Banyumas, Jawa Tengah', lat: -7.4244, lon: 109.2391, km: 185 },
-
-                        // JATIM, JABODETABEK, BALI (LUAR KOTA KELAS JAUH)
                         { title: 'Kota Surabaya (Balai Kota / Pemprov Jatim)', subtitle: 'Pusat Kota Surabaya, Jawa Timur', lat: -7.2575, lon: 112.7521, km: 260 },
                         { title: 'Bandara Juanda Surabaya', subtitle: 'Sidoarjo, Jawa Timur', lat: -7.3797, lon: 112.7874, km: 265 },
                         { title: 'Kota Malang / Universitas Brawijaya', subtitle: 'Kota Malang, Jawa Timur', lat: -7.9528, lon: 112.6144, km: 290 },
@@ -1360,6 +1659,26 @@ function handleReq(e){
             },
 
             computed: {
+                vehicleMap() {
+                    const map = new Map();
+                    (this.vehicles || []).forEach(v => {
+                        if (!v) return;
+                        if (v.id) map.set(String(v.id).replace(/\s+/g, '').toLowerCase(), v);
+                        if (v.plate) map.set(String(v.plate).replace(/\s+/g, '').toLowerCase(), v);
+                    });
+                    return map;
+                },
+
+                driverMap() {
+                    const map = new Map();
+                    (this.drivers || []).forEach(d => {
+                        if (!d) return;
+                        if (d.id) map.set(String(d.id).trim().toLowerCase(), d);
+                        if (d.name) map.set(String(d.name).trim().toLowerCase(), d);
+                    });
+                    return map;
+                },
+
                 deleteModalMessage() {
                     if (this.vehicleToDelete && this.vehicleToDelete.plate) {
                         return 'Apakah Anda yakin ingin menghapus data armada ' + this.vehicleToDelete.plate + '?';
@@ -1378,6 +1697,7 @@ function handleReq(e){
                     return months[this.calMonth] || '';
                 },
 
+                // HIGH-PERFORMANCE MULTI-DAY CALENDAR WEEKS COMPUTED PROPERTY
                 calendarWeeks() {
                     const year = this.calYear;
                     const month = this.calMonth;
@@ -1427,6 +1747,13 @@ function handleReq(e){
                         });
                     }
 
+                    // Pre-process active bookings date boundaries once for performance
+                    const parsedBookings = (this.bookings || []).filter(b => b && b.startDate && b.status !== 'REJECTED').map(b => {
+                        const bStart = this.getLocalDateString(b.startDate);
+                        const bEnd = b.endDate ? this.getLocalDateString(b.endDate) : bStart;
+                        return { b, bStart, bEnd };
+                    });
+
                     const MAX_VISIBLE_SLOTS = 6;
                     const weeks = [];
 
@@ -1441,16 +1768,14 @@ function handleReq(e){
                         const weekStartStr = validDates[0];
                         const weekEndStr = validDates[validDates.length - 1];
 
-                        const overlappingBookings = (this.bookings || []).filter(b => {
-                            if (!b || !b.startDate || b.status === 'REJECTED') return false;
-                            const bStart = this.getLocalDateString(b.startDate);
-                            const bEnd = b.endDate ? this.getLocalDateString(b.endDate) : bStart;
-                            return bStart <= weekEndStr && bEnd >= weekStartStr;
+                        const overlappingBookings = parsedBookings.filter(item => {
+                            return item.bStart <= weekEndStr && item.bEnd >= weekStartStr;
                         });
 
-                        const eventItems = overlappingBookings.map(b => {
-                            const bStart = this.getLocalDateString(b.startDate);
-                            const bEnd = b.endDate ? this.getLocalDateString(b.endDate) : bStart;
+                        const eventItems = overlappingBookings.map(item => {
+                            const b = item.b;
+                            const bStart = item.bStart;
+                            const bEnd = item.bEnd;
 
                             let startIndex = 0;
                             let endIndex = 6;
@@ -1474,6 +1799,10 @@ function handleReq(e){
                             const isStartOfBooking = bStart >= weekDays[startIndex].dateStr;
                             const isEndOfBooking = bEnd <= weekDays[endIndex].dateStr;
 
+                            // Pre-compute label & badgeStyle ONCE to eliminate template CPU bottleneck
+                            const label = this.getCalEventLabel(b);
+                            const badgeStyle = this.getCalBadgeStyle(b);
+
                             return {
                                 b,
                                 bStart,
@@ -1483,7 +1812,9 @@ function handleReq(e){
                                 span,
                                 isStartOfBooking,
                                 isEndOfBooking,
-                                slot: 1
+                                slot: 1,
+                                label,
+                                badgeStyle
                             };
                         });
 
@@ -1566,11 +1897,14 @@ function handleReq(e){
                         return targetDate >= bStart && targetDate <= bEnd && (b.status === 'APPROVED' || b.status === 'IN_PROGRESS');
                     });
 
-                    const busyVehicleIds = dutyBookings.map(b => b.vehicleId);
-                    const busyDriverIds = dutyBookings.map(b => b.driverId);
+                    const busyVehicleObjs = dutyBookings.map(b => this.getVehicleObj(b.vehicleId)).filter(Boolean);
+                    const busyDriverObjs = dutyBookings.map(b => this.getDriverObj(b.driverId)).filter(Boolean);
 
-                    const readyVehicles = (this.vehicles || []).filter(v => v && v.isAvailable !== false && !busyVehicleIds.includes(v.id) && !busyVehicleIds.includes(v.plate));
-                    const readyDrivers = (this.drivers || []).filter(d => d && d.isAvailable !== false && !busyDriverIds.includes(d.id) && !busyDriverIds.includes(d.name));
+                    const busyVehicleIds = busyVehicleObjs.map(v => v.id);
+                    const busyDriverIds = busyDriverObjs.map(d => d.id);
+
+                    const readyVehicles = (this.vehicles || []).filter(v => v && v.isAvailable !== false && !busyVehicleIds.includes(v.id));
+                    const readyDrivers = (this.drivers || []).filter(d => d && d.isAvailable !== false && !busyDriverIds.includes(d.id));
 
                     return { dutyBookings, readyVehicles, readyDrivers };
                 },
@@ -1584,8 +1918,9 @@ function handleReq(e){
 
                     return activeDriversList.map(driver => {
                         const driverBookings = (this.bookings || []).filter(b => {
-                            if (!b || (b.driverId !== driver.id && b.driverId !== driver.name)) return false;
-                            if (b.status === 'REJECTED') return false;
+                            if (!b || b.status === 'REJECTED') return false;
+                            const matchedDriver = this.getDriverObj(b.driverId);
+                            if (!matchedDriver || matchedDriver.id !== driver.id) return false;
                             const startStr = this.getLocalDateString(b.startDate);
                             return startStr.startsWith(monthKey);
                         });
@@ -1596,21 +1931,27 @@ function handleReq(e){
                         let totalKm = 0;
 
                         driverBookings.forEach(b => {
-                            const est = Number(b.estimatedDistance) || 50; // Distance one-way in KM
-                            totalKm += (est * 2); // Round-trip (PP) accumulation
+                            const est = Number(b.estimatedDistance) || 50;
+                            totalKm += (est * 2);
 
                             const startYMD = this.getLocalDateString(b.startDate);
                             const endYMD = this.getLocalDateString(b.endDate || b.startDate);
 
                             if (startYMD && endYMD) {
-                                let curr = new Date(startYMD + 'T00:00:00');
-                                const end = new Date(endYMD + 'T00:00:00');
+                                const startParts = startYMD.split('-').map(Number);
+                                const endParts = endYMD.split('-').map(Number);
+                                const startDt = new Date(startParts[0], startParts[1] - 1, startParts[2]);
+                                const endDt = new Date(endParts[0], endParts[1] - 1, endParts[2]);
 
-                                while (curr <= end) {
-                                    const dStr = this.getLocalDateString(curr);
+                                let curr = new Date(startDt.getTime());
+                                while (curr <= endDt) {
+                                    const y = curr.getFullYear();
+                                    const m = String(curr.getMonth() + 1).padStart(2, '0');
+                                    const d = String(curr.getDate()).padStart(2, '0');
+                                    const dStr = `${y}-${m}-${d}`;
+                                    
                                     if (dStr.startsWith(monthKey)) {
                                         activeDaysSet.add(dStr);
-                                        // Threshold: <= 40 KM One-way (<= 80 KM PP) = Dalam Kota
                                         if (est <= 40) cityActiveDays++;
                                         else outstationActiveDays++;
                                     }
@@ -1637,6 +1978,81 @@ function handleReq(e){
             },
 
             methods: {
+                getDriverObj(dId) {
+                    if (!dId) return null;
+                    const clean = String(dId).trim().toLowerCase();
+                    if (this.driverMap.has(clean)) return this.driverMap.get(clean);
+                    return (this.drivers || []).find(d => {
+                        if (!d) return false;
+                        if (clean.includes('budi') && d.name.toLowerCase().includes('budi')) return true;
+                        if ((clean.includes('pono') || clean.includes('sumpono')) && d.name.toLowerCase().includes('sumpono')) return true;
+                        if ((clean.includes('wahyu') || clean.includes('wachyu') || clean.includes('wsh')) && d.name.toLowerCase().includes('wachyu')) return true;
+                        if (clean.includes('joko') && d.name.toLowerCase().includes('joko')) return true;
+                        return false;
+                    }) || null;
+                },
+
+                getVehicleObj(vId) {
+                    if (!vId) return null;
+                    const clean = String(vId).replace(/\s+/g, '').toLowerCase();
+                    if (this.vehicleMap.has(clean)) return this.vehicleMap.get(clean);
+                    return (this.vehicles || []).find(v => {
+                        if (!v) return false;
+                        if (v.model && String(v.model).replace(/\s+/g, '').toLowerCase().includes(clean)) return true;
+                        return false;
+                    }) || null;
+                },
+
+                isDriverBusy(driverId, startIso, endIso, ignoreBookingId = null) {
+                    if (!driverId || !startIso || !endIso) return false;
+                    const targetDriver = this.getDriverObj(driverId);
+                    if (!targetDriver) return false;
+
+                    const sTarget = new Date(startIso).getTime();
+                    const eTarget = new Date(endIso).getTime();
+
+                    if (isNaN(sTarget) || isNaN(eTarget)) return false;
+
+                    return (this.bookings || []).some(b => {
+                        if (!b || !b.startDate || !b.driverId) return false;
+                        if (ignoreBookingId && b.id === ignoreBookingId) return false;
+                        if (b.status === 'REJECTED') return false;
+
+                        const bDriver = this.getDriverObj(b.driverId);
+                        if (!bDriver || bDriver.id !== targetDriver.id) return false;
+
+                        const sB = new Date(b.startDate).getTime();
+                        const eB = new Date(b.endDate ? b.endDate : b.startDate).getTime();
+
+                        return Math.max(sTarget, sB) < Math.min(eTarget, eB);
+                    });
+                },
+
+                isVehicleBusy(vehicleId, startIso, endIso, ignoreBookingId = null) {
+                    if (!vehicleId || !startIso || !endIso) return false;
+                    const targetVehicle = this.getVehicleObj(vehicleId);
+                    if (!targetVehicle) return false;
+
+                    const sTarget = new Date(startIso).getTime();
+                    const eTarget = new Date(endIso).getTime();
+
+                    if (isNaN(sTarget) || isNaN(eTarget)) return false;
+
+                    return (this.bookings || []).some(b => {
+                        if (!b || !b.startDate || !b.vehicleId) return false;
+                        if (ignoreBookingId && b.id === ignoreBookingId) return false;
+                        if (b.status === 'REJECTED') return false;
+
+                        const bVehicle = this.getVehicleObj(b.vehicleId);
+                        if (!bVehicle || bVehicle.id !== targetVehicle.id) return false;
+
+                        const sB = new Date(b.startDate).getTime();
+                        const eB = new Date(b.endDate ? b.endDate : b.startDate).getTime();
+
+                        return Math.max(sTarget, sB) < Math.min(eTarget, eB);
+                    });
+                },
+
                 openDriverDetailModal(stats) {
                     this.selectedDriverDetail = stats;
                     this.activeDriverDetailModal = true;
@@ -1645,8 +2061,8 @@ function handleReq(e){
                 getLocalDateString(dateInput) {
                     if (!dateInput) return '';
                     if (typeof dateInput === 'string' && dateInput.length >= 10) {
-                        const match = dateInput.match(/^(\d{4}-\d{2}-\d{2})/);
-                        if (match) return match[1];
+                        const sub = dateInput.substring(0, 10);
+                        if (/^\d{4}-\d{2}-\d{2}$/.test(sub)) return sub;
                     }
                     const d = new Date(dateInput);
                     if (isNaN(d.getTime())) return String(dateInput).substring(0, 10);
@@ -1692,7 +2108,7 @@ function handleReq(e){
 
                 getDriverShortName(dId) {
                     if (!dId) return '';
-                    const d = (this.drivers || []).find(x => x && (x.id === dId || x.name === dId));
+                    const d = this.getDriverObj(dId);
                     let name = d ? d.name : String(dId);
                     if (!name || name === 'Belum Ditentukan') return '';
                     
@@ -1702,7 +2118,7 @@ function handleReq(e){
 
                 getVehicleShortName(vId) {
                     if (!vId) return '';
-                    const v = (this.vehicles || []).find(x => x && (x.id === vId || x.plate === vId));
+                    const v = this.getVehicleObj(vId);
                     let raw = v ? v.model : String(vId);
                     if (!raw || raw === '-') return '';
                     
@@ -1753,7 +2169,7 @@ function handleReq(e){
 
                 getCalBadgeStyle(b) {
                     if (b.status === 'REJECTED') return 'bg-rose-900/80 text-rose-200 border border-rose-700';
-                    const v = (this.vehicles || []).find(x => x && (x.id === b.vehicleId || x.plate === b.vehicleId));
+                    const v = this.getVehicleObj(b.vehicleId);
                     const vColor = (v && v.color) ? v.color : 'sky';
                     const palette = (this.colorPalette || []).find(p => p.id === vColor);
                     return palette ? `${palette.bgClass} font-bold` : 'bg-sky-400 text-slate-950 font-bold';
@@ -2050,6 +2466,16 @@ Teks memo/pesan: ${this.geminiInputText}`;
                         return;
                     }
 
+                    if (this.bookingForm.driverId && this.isDriverBusy(this.bookingForm.driverId, this.bookingForm.startDate, this.bookingForm.endDate, this.editingBookingId)) {
+                        const dObj = this.getDriverObj(this.bookingForm.driverId);
+                        this.showToast(`Peringatan: Driver ${dObj ? dObj.name : ''} memiliki jadwal bentrok!`, 'error');
+                    }
+
+                    if (this.bookingForm.vehicleId && this.isVehicleBusy(this.bookingForm.vehicleId, this.bookingForm.startDate, this.bookingForm.endDate, this.editingBookingId)) {
+                        const vObj = this.getVehicleObj(this.bookingForm.vehicleId);
+                        this.showToast(`Peringatan: Mobil ${vObj ? vObj.plate : ''} memiliki jadwal bentrok!`, 'error');
+                    }
+
                     let savedBooking;
                     if (this.editingBookingId) {
                         const idx = (this.bookings || []).findIndex(b => b.id === this.editingBookingId);
@@ -2236,11 +2662,10 @@ Teks memo/pesan: ${this.geminiInputText}`;
                         return;
                     }
 
-                    // 1. Check Local High-Speed Database Match
                     const matchedPresets = this.presetLocations.filter(loc => 
                         loc.title.toLowerCase().includes(q) || 
                         loc.subtitle.toLowerCase().includes(q)
-                    );
+                    ).slice(0, 5);
 
                     this.destinationSuggestions = matchedPresets.map(p => ({
                         title: p.title,
@@ -2248,7 +2673,6 @@ Teks memo/pesan: ${this.geminiInputText}`;
                         km: p.km
                     }));
 
-                    // 2. Fetch Online Nominatim Backup if queries > 2 chars
                     this.searchDebounceTimer = setTimeout(async () => {
                         if (q.length >= 3) {
                             this.isSearchingLocation = true;
@@ -2263,10 +2687,11 @@ Teks memo/pesan: ${this.geminiInputText}`;
                                         return { title, subtitle, km };
                                     });
 
-                                    // Merge unique items avoiding duplicates
                                     fetchedItems.forEach(fi => {
                                         if (!this.destinationSuggestions.some(existing => existing.title.toLowerCase() === fi.title.toLowerCase())) {
-                                            this.destinationSuggestions.push(fi);
+                                            if (this.destinationSuggestions.length < 6) {
+                                                this.destinationSuggestions.push(fi);
+                                            }
                                         }
                                     });
                                 }
@@ -2293,14 +2718,13 @@ Teks memo/pesan: ${this.geminiInputText}`;
                               Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
                               Math.sin(dLon/2) * Math.sin(dLon/2);
                     const straightKm = R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
-                    return Math.max(5, Math.round(straightKm * 1.28)); // 1.28 Road Winding Factor
+                    return Math.max(5, Math.round(straightKm * 1.28));
                 },
 
                 estimateGCalLocationAndDistance(rawLoc, titleStr = '', descStr = '') {
                     let loc = (rawLoc || '').trim();
                     const combinedText = `${titleStr} ${descStr} ${loc}`.toLowerCase();
 
-                    // 1. Clean up generic or vague location strings
                     if (!loc || loc.toLowerCase() === 'indonesia' || loc.length < 3) {
                         if (combinedText.includes('mangkunegaran')) loc = 'Gedung Mangkunegaran (Surakarta)';
                         else if (combinedText.includes('balai kota solo') || combinedText.includes('surakarta')) loc = 'Balai Kota Surakarta';
@@ -2318,7 +2742,6 @@ Teks memo/pesan: ${this.geminiInputText}`;
                         else loc = loc || 'Kampus UNS Kentingan Surakarta';
                     }
 
-                    // 2. Exact match against rich local database
                     const cleanLocLower = loc.toLowerCase();
                     let matchedPreset = this.presetLocations.find(p => cleanLocLower.includes(p.title.toLowerCase()) || cleanLocLower.includes(p.subtitle.toLowerCase()));
 
@@ -2355,22 +2778,6 @@ Teks memo/pesan: ${this.geminiInputText}`;
                     }
 
                     return { destination: matchedPreset.title, estimatedDistance: matchedPreset.km };
-                },
-
-                selectLocationSuggestion(s) {
-                    this.bookingForm.destination = s.title;
-                    this.bookingForm.estimatedDistance = s.km;
-                    this.destinationSuggestions = [];
-                },
-
-                calcHaversineDistance(lat1, lon1, lat2, lon2) {
-                    const R = 6371; 
-                    const dLat = (lat2 - lat1) * Math.PI / 180;
-                    const dLon = (lon2 - lon1) * Math.PI / 180;
-                    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-                              Math.sin(dLon/2) * Math.sin(dLon/2);
-                    return Math.round(R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))) * 1.25);
                 },
 
                 toggleVehicleAvailability(v) {
@@ -2423,7 +2830,7 @@ Teks memo/pesan: ${this.geminiInputText}`;
                 },
 
                 openWaDriverChat(b) {
-                    const driver = (this.drivers || []).find(d => d && (d.id === b.driverId || d.name === b.driverId));
+                    const driver = this.getDriverObj(b.driverId);
                     const rawPhone = driver && driver.phone ? driver.phone : b.phone;
                     let cleanPhone = String(rawPhone || '').replace(/[^0-9]/g, '');
                     if (cleanPhone.startsWith('0')) cleanPhone = '62' + cleanPhone.substring(1);
@@ -2495,59 +2902,6 @@ Teks memo/pesan: ${this.geminiInputText}`;
                     this.pullEventsFromGoogleCalendar(false);
                 },
 
-                estimateGCalLocationAndDistance(rawLoc, titleStr = '', descStr = '') {
-                    let loc = (rawLoc || '').trim();
-                    const combinedText = `${titleStr} ${descStr} ${loc}`.toLowerCase();
-
-                    if (!loc || loc.toLowerCase() === 'indonesia' || loc.length < 3) {
-                        if (combinedText.includes('jakarta') || combinedText.includes('dki') || combinedText.includes('monas') || combinedText.includes('senayan')) loc = 'DKI Jakarta';
-                        else if (combinedText.includes('jogja') || combinedText.includes('yogyakarta') || combinedText.includes('ugm') || combinedText.includes('uny')) loc = 'Yogyakarta';
-                        else if (combinedText.includes('semarang') || combinedText.includes('undip')) loc = 'Semarang';
-                        else if (combinedText.includes('surabaya')) loc = 'Surabaya';
-                        else if (combinedText.includes('bali') || combinedText.includes('denpasar') || combinedText.includes('kuta')) loc = 'Bali';
-                        else if (combinedText.includes('bandung') || combinedText.includes('itb')) loc = 'Bandung';
-                        else if (combinedText.includes('magelang') || combinedText.includes('borobudur')) loc = 'Magelang';
-                        else if (combinedText.includes('madiun')) loc = 'Madiun';
-                        else if (combinedText.includes('malang')) loc = 'Malang';
-                        else if (combinedText.includes('mangkunegaran')) loc = 'Gedung Mangkunegaran (Surakarta)';
-                        else if (combinedText.includes('solo') || combinedText.includes('surakarta') || combinedText.includes('uns') || combinedText.includes('kentingan')) loc = 'Surakarta (Dalam Kota)';
-                        else loc = loc || 'Surakarta / Dalam Kota';
-                    }
-
-                    const cleanLocLower = loc.toLowerCase();
-                    
-                    const distanceMap = [
-                        { keywords: ['uns', 'kentingan', 'surakarta', 'solo', 'sukoharjo', 'karanganyar', 'mangkunegaran', 'colomadu', 'palur'], km: 15 },
-                        { keywords: ['klaten', 'wonogiri', 'boyolali', 'sragen'], km: 35 },
-                        { keywords: ['salatiga'], km: 50 },
-                        { keywords: ['yogyakarta', 'jogja', 'sleman', 'bantul', 'ugm', 'uny', 'kulon progo'], km: 60 },
-                        { keywords: ['magelang', 'borobudur', 'muntilan'], km: 85 },
-                        { keywords: ['madiun', 'ngawi', 'magetan', 'ponorogo'], km: 100 },
-                        { keywords: ['semarang', 'undip', 'simpang lima'], km: 100 },
-                        { keywords: ['kudus', 'demak', 'pati', 'jepara'], km: 120 },
-                        { keywords: ['kediri', 'blitar', 'nganjuk', 'tulungagung'], km: 160 },
-                        { keywords: ['purwokerto', 'banyumas', 'cilacap', 'kebumen', 'purworejo', 'pekalongan', 'tegal'], km: 180 },
-                        { keywords: ['surabaya', 'sidoarjo', 'gresik', 'mojokerto'], km: 260 },
-                        { keywords: ['malang', 'batu'], km: 300 },
-                        { keywords: ['cirebon'], km: 320 },
-                        { keywords: ['bandung', 'lembang', 'itb', 'jatinangor'], km: 450 },
-                        { keywords: ['banyuwangi', 'ketapang'], km: 480 },
-                        { keywords: ['jakarta', 'dki', 'monas', 'senayan', 'gambir', 'soekarno hatta', 'tangerang', 'bekasi', 'depok', 'bogor', 'jabodetabek'], km: 550 },
-                        { keywords: ['serang', 'cilegon', 'banten'], km: 600 },
-                        { keywords: ['bali', 'denpasar', 'kuta', 'nusa dua', 'ubud', 'singaraja', 'badung'], km: 650 }
-                    ];
-
-                    let estimatedKm = 25; // Default fallback
-                    for (const item of distanceMap) {
-                        if (item.keywords.some(kw => cleanLocLower.includes(kw))) {
-                            estimatedKm = item.km;
-                            break;
-                        }
-                    }
-
-                    return { destination: loc, estimatedDistance: estimatedKm };
-                },
-
                 async pullEventsFromGoogleCalendar(isSilent = false) {
                     if (!this.gcalWebhookUrl) {
                         if (!isSilent) this.showToast('Set URL Webhook Google Calendar terlebih dahulu!', 'error');
@@ -2571,7 +2925,6 @@ Teks memo/pesan: ${this.geminiInputText}`;
                                 const startFormatted = this.formatGCalDate(ev.startDate, ev.isAllDay, false);
                                 const endFormatted = this.formatGCalDate(ev.endDate, ev.isAllDay, true);
 
-                                // Strict First Segment Driver Matching
                                 let matchedDriverId = '';
                                 const titleParts = titleStr.split(/\s*-\s*/);
                                 const firstSegment = (titleParts[0] || '').toLowerCase().trim();
@@ -2599,7 +2952,6 @@ Teks memo/pesan: ${this.geminiInputText}`;
                                     if (d) matchedDriverId = d.id;
                                 }
 
-                                // Vehicle Matching
                                 let matchedVehicleId = '';
                                 const plateMatch = combinedText.match(/ad\s*\d{3,4}\s*[a-z]{1,3}/i);
                                 if (plateMatch) {
@@ -2690,11 +3042,11 @@ Teks memo/pesan: ${this.geminiInputText}`;
                     }
                 },
 
-                getVehiclePlate(vId) { const v = (this.vehicles || []).find(x => x && (x.id === vId || x.plate === vId)); return v ? v.plate : (vId || '-'); },
-                getVehicleModel(vId) { const v = (this.vehicles || []).find(x => x && (x.id === vId || x.plate === vId)); return v ? v.model : '-'; },
+                getVehiclePlate(vId) { const v = this.getVehicleObj(vId); return v ? v.plate : (vId || '-'); },
+                getVehicleModel(vId) { const v = this.getVehicleObj(vId); return v ? v.model : '-'; },
                 getDriverName(dId) { 
                     if (!dId) return 'Belum Ditentukan';
-                    const d = (this.drivers || []).find(x => x && (x.id === dId || x.name === dId)); 
+                    const d = this.getDriverObj(dId); 
                     return d ? d.name : dId; 
                 },
 
@@ -2716,6 +3068,10 @@ Teks memo/pesan: ${this.geminiInputText}`;
 
                 formatDateWib(dateStr) {
                     if (!dateStr) return '-';
+                    if (typeof dateStr === 'string' && dateStr.length >= 10 && /^\d{4}-\d{2}-\d{2}$/.test(dateStr.substring(0, 10))) {
+                        const parts = dateStr.substring(0, 10).split('-');
+                        return `${parts[2]}-${parts[1]}-${parts[0]}`;
+                    }
                     const d = new Date(dateStr);
                     return isNaN(d.getTime()) ? dateStr : `${String(d.getDate()).padStart(2,'0')}-${String(d.getMonth()+1).padStart(2,'0')}-${d.getFullYear()}`;
                 },
@@ -2740,7 +3096,6 @@ Teks memo/pesan: ${this.geminiInputText}`;
                 setupRealtimeListeners() {
                     if (!db) return;
 
-                    // REALTIME SETTINGS SYNC (CLOUD & LOCAL)
                     onValue(ref(db, `artifacts/${appId}/public/data/settings`), snap => {
                         const s = snap.val();
                         if (s) {
