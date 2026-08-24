@@ -361,13 +361,29 @@
                         </div>
                     </div>
 
-                    <!-- SORT CONTROLS -->
-                    <div class="flex items-center gap-2">
-                        <span class="text-xs text-slate-400 font-semibold"><i class="fa-solid fa-sort text-amber-400 mr-1"></i>Urutkan:</span>
-                        <select v-model="unassignedSortOrder" class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white font-bold focus:border-amber-500 focus:outline-none">
-                            <option value="NEAREST">📅 Terdekat (Hari Ini → Mendatang)</option>
-                            <option value="FURTHEST">⌛ Terlama / Terjauh</option>
-                        </select>
+                    <!-- FILTER & SORT CONTROLS -->
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <div class="flex items-center gap-1.5">
+                            <span class="text-xs text-slate-400 font-semibold"><i class="fa-solid fa-filter text-amber-400 mr-1"></i>Bulan:</span>
+                            <select v-model="unassignedMonthFilter" class="bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-1.5 text-xs text-white font-bold focus:border-amber-500 focus:outline-none">
+                                <option value="ALL">Semua Bulan</option>
+                                <option v-for="m in 12" :key="m" :value="m">{{ getMonthName(m) }}</option>
+                            </select>
+                            <select v-model="unassignedYearFilter" class="bg-slate-950 border border-slate-800 rounded-xl px-2.5 py-1.5 text-xs text-white font-bold focus:border-amber-500 focus:outline-none">
+                                <option value="ALL">Semua Thn</option>
+                                <option :value="2025">2025</option>
+                                <option :value="2026">2026</option>
+                                <option :value="2027">2027</option>
+                            </select>
+                        </div>
+
+                        <div class="flex items-center gap-1.5">
+                            <span class="text-xs text-slate-400 font-semibold"><i class="fa-solid fa-sort text-amber-400 mr-1"></i>Urutkan:</span>
+                            <select v-model="unassignedSortOrder" class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white font-bold focus:border-amber-500 focus:outline-none">
+                                <option value="NEAREST">📅 Terdekat (Hari Ini → Mendatang)</option>
+                                <option value="FURTHEST">⌛ Terlama / Terjauh</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
 
@@ -1680,6 +1696,8 @@ function handleReq(e){
                     scheduleDateFilter: todayStr,
                     requestStatusFilter: 'ALL',
                     unassignedSortOrder: 'NEAREST',
+                    unassignedMonthFilter: 'ALL',
+                    unassignedYearFilter: 'ALL',
 
                     recapMonth: now.getMonth() + 1,
                     recapYear: now.getFullYear(),
@@ -1833,6 +1851,30 @@ function handleReq(e){
                         const drv = this.getDriverObj(b.driverId);
                         return !drv || !drv.id || drv.name === 'Belum Ditentukan';
                     });
+
+                    if (this.unassignedMonthFilter !== 'ALL') {
+                        const selectedMonthStr = String(this.unassignedMonthFilter).padStart(2, '0');
+                        list = list.filter(b => {
+                            if (!b || !b.startDate) return false;
+                            const startStr = this.getLocalDateString(b.startDate);
+                            if (!startStr) return false;
+                            const parts = startStr.split('-');
+                            if (parts.length >= 2) {
+                                if (parts[1] !== selectedMonthStr) return false;
+                                if (this.unassignedYearFilter !== 'ALL' && parts[0] !== String(this.unassignedYearFilter)) {
+                                    return false;
+                                }
+                                return true;
+                            }
+                            return false;
+                        });
+                    } else if (this.unassignedYearFilter !== 'ALL') {
+                        list = list.filter(b => {
+                            if (!b || !b.startDate) return false;
+                            const startStr = this.getLocalDateString(b.startDate);
+                            return startStr && startStr.startsWith(String(this.unassignedYearFilter));
+                        });
+                    }
 
                     list.sort((a, b) => {
                         const timeA = new Date(a.startDate || 0).getTime();
@@ -2195,12 +2237,26 @@ function handleReq(e){
                     this.isCloudConnected = true;
 
                     try {
-                        // Realtime listener for bookings
+                        // Realtime listener for bookings with auto-deduplication
                         const bookingsCol = collection(db, `artifacts/${appId}/public/data/bookings`);
                         onSnapshot(bookingsCol, (snap) => {
                             const list = [];
+                            const seenKeys = new Set();
                             snap.forEach(docSnap => {
-                                if (docSnap.exists()) list.push(docSnap.data());
+                                if (docSnap.exists()) {
+                                    const data = docSnap.data();
+                                    if (data && data.id) {
+                                        // Composite deduplication key to eliminate legacy duplicates across devices
+                                        const cleanId = String(data.id).replace(/[\/\.\#\$\[\]\s]/g, '_');
+                                        const fuzzyKey = `${data.applicantName || ''}_${data.startDate || ''}_${data.endDate || ''}_${data.destination || ''}`;
+                                        
+                                        if (!seenKeys.has(cleanId) && !seenKeys.has(fuzzyKey)) {
+                                            seenKeys.add(cleanId);
+                                            if (fuzzyKey.length > 10) seenKeys.add(fuzzyKey);
+                                            list.push(data);
+                                        }
+                                    }
+                                }
                             });
                             if (list.length > 0) {
                                 this.bookings = list;
@@ -2283,9 +2339,11 @@ function handleReq(e){
                 async saveToFirestore(colName, docId, data) {
                     if (!db || !docId) return;
                     try {
-                        const cleanDocId = String(docId).replace(/[\/\.\#\$\[\]]/g, '_');
+                        const cleanDocId = String(docId).replace(/[\/\.\#\$\[\]\s]/g, '_');
                         const docRef = doc(db, `artifacts/${appId}/public/data/${colName}`, cleanDocId);
-                        await setDoc(docRef, JSON.parse(JSON.stringify(data)), { merge: true });
+                        const dataToSave = JSON.parse(JSON.stringify(data));
+                        dataToSave.id = cleanDocId; // Standardize internal ID with Firestore Document ID
+                        await setDoc(docRef, dataToSave, { merge: true });
                     } catch (e) {
                         console.warn(`Firestore save error (${colName}/${docId}):`, e);
                     }
@@ -3480,12 +3538,43 @@ Teks memo/pesan: ${this.geminiInputText}`;
                                 }
 
                                 const locInfo = this.estimateGCalLocationAndDistance(ev.location, titleStr, descStr);
-                                const eventId = ev.automanId || (ev.id ? 'GCAL-' + String(ev.id) : 'UNS-GCAL-' + Math.floor(100000 + Math.random() * 900000));
                                 
-                                const existingIdx = (this.bookings || []).findIndex(b => b && (b.id === eventId || b.id === ev.id || (ev.automanId && b.id === ev.automanId)));
+                                // DETERMINISTIC ID GENERATION (NO RANDOM NUMBERS TO PREVENT MULTI-DEVICE DUPLICATES)
+                                const rawGCalId = ev.automanId || ev.id || '';
+                                const cleanGCalId = String(rawGCalId).replace(/[\/\.\#\$\[\]\s]/g, '_');
                                 
+                                let eventId = '';
+                                if (ev.automanId) {
+                                    eventId = String(ev.automanId).replace(/[\/\.\#\$\[\]\s]/g, '_');
+                                } else if (cleanGCalId) {
+                                    eventId = 'GCAL_' + cleanGCalId;
+                                } else {
+                                    const strKey = (applicantUnit || titleStr) + '_' + startFormatted + '_' + endFormatted;
+                                    let hash = 0;
+                                    for (let k = 0; k < strKey.length; k++) {
+                                        hash = ((hash << 5) - hash) + strKey.charCodeAt(k);
+                                        hash |= 0;
+                                    }
+                                    eventId = 'UNS_GCAL_' + Math.abs(hash);
+                                }
+
+                                // MULTI-LEVEL DEDUPLICATION CHECK
+                                const existingIdx = (this.bookings || []).findIndex(b => {
+                                    if (!b) return false;
+                                    if (b.id === eventId) return true;
+                                    if (cleanGCalId && (b.gcalId === cleanGCalId || b.id === 'GCAL_' + cleanGCalId)) return true;
+                                    if (ev.automanId && (b.id === ev.automanId || b.automanId === ev.automanId)) return true;
+                                    // Fuzzy match for identical schedule, applicant and destination
+                                    if (b.startDate === startFormatted && b.endDate === endFormatted && b.applicantName === (applicantUnit || 'Agenda Google Cal') && b.destination === locInfo.destination) {
+                                        return true;
+                                    }
+                                    return false;
+                                });
+
                                 const bookingObj = {
                                     id: eventId,
+                                    gcalId: cleanGCalId,
+                                    automanId: ev.automanId || '',
                                     applicantName: applicantUnit || 'Agenda Google Cal',
                                     unit: applicantUnit || 'Google Calendar',
                                     phone: '-',
@@ -3505,10 +3594,11 @@ Teks memo/pesan: ${this.geminiInputText}`;
                                     this.saveToFirestore('bookings', bookingObj.id, bookingObj);
                                     addedCount++;
                                 } else {
-                                    // Retain assigned driver if existing booking has one assigned manually
+                                    // Preserve driver assignment if manually updated on app
                                     if (this.bookings[existingIdx].driverId && !bookingObj.driverId) {
                                         bookingObj.driverId = this.bookings[existingIdx].driverId;
                                     }
+                                    bookingObj.id = this.bookings[existingIdx].id; // Keep exact ID
                                     this.bookings[existingIdx] = bookingObj;
                                     this.saveToFirestore('bookings', bookingObj.id, bookingObj);
                                     updatedCount++;
