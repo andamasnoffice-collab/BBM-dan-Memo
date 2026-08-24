@@ -2167,6 +2167,19 @@ function handleReq(e){
             },
 
             methods: {
+                async seedCollectionIfEmpty(colName, defaultItems) {
+                    if (!db) return;
+                    try {
+                        for (const item of defaultItems) {
+                            if (item && item.id) {
+                                await this.saveToFirestore(colName, item.id, item);
+                            }
+                        }
+                    } catch (e) {
+                        console.warn(`Seeding ${colName} error:`, e);
+                    }
+                },
+
                 async initFirebaseRealtimeSync() {
                     if (!db) return;
                     try {
@@ -2187,7 +2200,7 @@ function handleReq(e){
                         onSnapshot(bookingsCol, (snap) => {
                             const list = [];
                             snap.forEach(docSnap => {
-                                list.push(docSnap.data());
+                                if (docSnap.exists()) list.push(docSnap.data());
                             });
                             if (list.length > 0) {
                                 this.bookings = list;
@@ -2197,38 +2210,47 @@ function handleReq(e){
 
                         // Realtime listener for drivers
                         const driversCol = collection(db, `artifacts/${appId}/public/data/drivers`);
-                        onSnapshot(driversCol, (snap) => {
-                            const list = [];
-                            snap.forEach(docSnap => {
-                                list.push(docSnap.data());
-                            });
-                            if (list.length > 0) {
-                                this.drivers = list;
-                                localStorage.setItem('uns_schedule_drivers', JSON.stringify(this.drivers));
+                        onSnapshot(driversCol, async (snap) => {
+                            if (snap.empty) {
+                                await this.seedCollectionIfEmpty('drivers', this.drivers);
+                            } else {
+                                const list = [];
+                                snap.forEach(docSnap => {
+                                    if (docSnap.exists()) list.push(docSnap.data());
+                                });
+                                if (list.length > 0) {
+                                    this.drivers = list;
+                                    localStorage.setItem('uns_schedule_drivers', JSON.stringify(this.drivers));
+                                }
                             }
                         }, (err) => console.warn("Drivers snapshot error:", err));
 
                         // Realtime listener for vehicles
                         const vehiclesCol = collection(db, `artifacts/${appId}/public/data/vehicles`);
-                        onSnapshot(vehiclesCol, (snap) => {
-                            const list = [];
-                            snap.forEach(docSnap => {
-                                list.push(docSnap.data());
-                            });
-                            if (list.length > 0) {
-                                this.vehicles = list;
-                                localStorage.setItem('uns_vehicles', JSON.stringify(this.vehicles));
+                        onSnapshot(vehiclesCol, async (snap) => {
+                            if (snap.empty) {
+                                await this.seedCollectionIfEmpty('vehicles', this.vehicles);
+                            } else {
+                                const list = [];
+                                snap.forEach(docSnap => {
+                                    if (docSnap.exists()) list.push(docSnap.data());
+                                });
+                                if (list.length > 0) {
+                                    this.vehicles = list;
+                                    localStorage.setItem('uns_vehicles', JSON.stringify(this.vehicles));
+                                }
                             }
                         }, (err) => console.warn("Vehicles snapshot error:", err));
 
-                        // Realtime listener for settings
+                        // Realtime listener for system settings
                         const settingsDoc = doc(db, `artifacts/${appId}/public/data/settings`, 'config');
                         onSnapshot(settingsDoc, (snap) => {
                             if (snap.exists()) {
                                 const s = snap.data();
-                                if (s.geminiApiKey) { this.geminiApiKey = s.geminiApiKey; localStorage.setItem('uns_gemini_api_key', s.geminiApiKey); }
-                                if (s.waGatewayToken) { this.waGatewayToken = s.waGatewayToken; localStorage.setItem('uns_wa_gateway_token', s.waGatewayToken); }
-                                if (s.gcalWebhookUrl) {
+                                if (s.geminiApiKey !== undefined) { this.geminiApiKey = s.geminiApiKey; localStorage.setItem('uns_gemini_api_key', s.geminiApiKey); }
+                                if (s.waGatewayToken !== undefined) { this.waGatewayToken = s.waGatewayToken; localStorage.setItem('uns_wa_gateway_token', s.waGatewayToken); }
+                                if (s.waGatewayProvider !== undefined) { this.waGatewayProvider = s.waGatewayProvider; localStorage.setItem('uns_wa_gateway_provider', s.waGatewayProvider); }
+                                if (s.gcalWebhookUrl !== undefined) {
                                     const oldUrl = this.gcalWebhookUrl;
                                     this.gcalWebhookUrl = s.gcalWebhookUrl;
                                     localStorage.setItem('uns_gcal_webhook_url', s.gcalWebhookUrl);
@@ -2236,12 +2258,104 @@ function handleReq(e){
                                         this.pullEventsFromGoogleCalendar(true);
                                     }
                                 }
-                                if (s.adminPassword) { this.adminPassword = s.adminPassword; localStorage.setItem('uns_admin_pwd', s.adminPassword); }
+                                if (s.gcalCalendarId !== undefined) { this.gcalCalendarId = s.gcalCalendarId; localStorage.setItem('uns_gcal_calendar_id', s.gcalCalendarId); }
+                                if (s.adminPassword !== undefined) { this.adminPassword = s.adminPassword; localStorage.setItem('uns_admin_pwd', s.adminPassword); }
                             }
                         }, (err) => console.warn("Settings snapshot error:", err));
 
                     } catch (e) {
                         console.error("Firestore listener error:", e);
+                    }
+                },
+
+                startAutoSyncTimer() {
+                    if (this.autoSyncTimerId) clearInterval(this.autoSyncTimerId);
+                    if (this.gcalWebhookUrl) {
+                        this.pullEventsFromGoogleCalendar(true);
+                        this.autoSyncTimerId = setInterval(() => {
+                            if (this.gcalWebhookUrl) {
+                                this.pullEventsFromGoogleCalendar(true);
+                            }
+                        }, 60000);
+                    }
+                },
+
+                async saveToFirestore(colName, docId, data) {
+                    if (!db || !docId) return;
+                    try {
+                        const cleanDocId = String(docId).replace(/[\/\.\#\$\[\]]/g, '_');
+                        const docRef = doc(db, `artifacts/${appId}/public/data/${colName}`, cleanDocId);
+                        await setDoc(docRef, JSON.parse(JSON.stringify(data)), { merge: true });
+                    } catch (e) {
+                        console.warn(`Firestore save error (${colName}/${docId}):`, e);
+                    }
+                },
+
+                async deleteFromFirestore(colName, docId) {
+                    if (!db || !docId) return;
+                    try {
+                        const cleanDocId = String(docId).replace(/[\/\.\#\$\[\]]/g, '_');
+                        const docRef = doc(db, `artifacts/${appId}/public/data/${colName}`, cleanDocId);
+                        await deleteDoc(docRef);
+                    } catch (e) {
+                        console.warn(`Firestore delete error (${colName}/${docId}):`, e);
+                    }
+                },
+
+                fetchGCalWithFallback(url) {
+                    return new Promise((resolve, reject) => {
+                        fetch(url)
+                            .then(res => res.json())
+                            .then(data => resolve(data))
+                            .catch(() => {
+                                const callbackName = 'gcal_cb_' + Math.floor(Math.random() * 1000000);
+                                const script = document.createElement('script');
+                                const sep = url.includes('?') ? '&' : '?';
+                                script.src = `${url}${sep}callback=${callbackName}`;
+
+                                let finished = false;
+                                window[callbackName] = (data) => {
+                                    finished = true;
+                                    cleanup();
+                                    resolve(data);
+                                };
+
+                                script.onerror = () => {
+                                    if (!finished) {
+                                        cleanup();
+                                        reject(new Error('Failed to fetch Google Calendar (CORS / Network error)'));
+                                    }
+                                };
+
+                                function cleanup() {
+                                    delete window[callbackName];
+                                    if (script.parentNode) script.parentNode.removeChild(script);
+                                }
+
+                                document.body.appendChild(script);
+
+                                setTimeout(() => {
+                                    if (!finished) {
+                                        cleanup();
+                                        reject(new Error('Google Calendar sync request timeout'));
+                                    }
+                                }, 12000);
+                            });
+                    });
+                },
+
+                async assignDriverAndSync(b) {
+                    if (!b || !b.driverId) return;
+                    const dObj = this.getDriverObj(b.driverId);
+                    if (!dObj) return;
+
+                    const idx = (this.bookings || []).findIndex(x => x.id === b.id);
+                    if (idx !== -1) {
+                        this.bookings[idx].driverId = dObj.id;
+                        localStorage.setItem('uns_schedule_bookings', JSON.stringify(this.bookings));
+                        this.saveToFirestore('bookings', b.id, this.bookings[idx]);
+                        this.pushBookingToGoogleCalendar(this.bookings[idx]);
+                        this.showToast(`Driver ${dObj.name} berhasil ditugaskan & disinkronkan ke Cloud & GCal!`, 'success');
                     }
                 },
 
@@ -2550,7 +2664,7 @@ function handleReq(e){
                     car.color = colorId;
                     localStorage.setItem('uns_vehicles', JSON.stringify(this.vehicles));
                     this.saveToFirestore('vehicles', car.id, car);
-                    this.showToast(`Warna badge ${car.plate} diperbarui!`, 'success');
+                    this.showToast(`Warna badge ${car.plate} diperbarui & tersimpan di Cloud!`, 'success');
                 },
 
                 openAddVehicleModal() {
@@ -2597,7 +2711,7 @@ function handleReq(e){
                         this.vehicles = (this.vehicles || []).filter(v => v && v.id !== targetId);
                         localStorage.setItem('uns_vehicles', JSON.stringify(this.vehicles));
                         this.deleteFromFirestore('vehicles', targetId);
-                        this.showToast(`Armada ${plate} berhasil dihapus.`, 'success');
+                        this.showToast(`Armada ${plate} berhasil dihapus dari Cloud.`, 'success');
                         this.vehicleToDelete = null;
                     } else if (this.driverToDelete && this.driverToDelete.id) {
                         const name = this.driverToDelete.name;
@@ -2605,13 +2719,13 @@ function handleReq(e){
                         this.drivers = (this.drivers || []).filter(d => d && d.id !== targetId);
                         localStorage.setItem('uns_schedule_drivers', JSON.stringify(this.drivers));
                         this.deleteFromFirestore('drivers', targetId);
-                        this.showToast(`Data driver ${name} berhasil dihapus.`, 'success');
+                        this.showToast(`Data driver ${name} berhasil dihapus dari Cloud.`, 'success');
                         this.driverToDelete = null;
                     } else if (this.bookingToDelete === 'ALL') {
                         this.bookings.forEach(b => this.deleteFromFirestore('bookings', b.id));
                         this.bookings = [];
                         localStorage.removeItem('uns_schedule_bookings');
-                        this.showToast('Semua data peminjaman telah dihapus.', 'success');
+                        this.showToast('Semua data peminjaman telah dihapus dari Cloud.', 'success');
                     } else if (this.bookingToDelete && this.bookingToDelete.id) {
                         const targetId = this.bookingToDelete.id;
                         this.bookings = (this.bookings || []).filter(b => b && b.id !== targetId);
@@ -3137,14 +3251,14 @@ Teks memo/pesan: ${this.geminiInputText}`;
                     v.isAvailable = (v.isAvailable === false);
                     localStorage.setItem('uns_vehicles', JSON.stringify(this.vehicles));
                     this.saveToFirestore('vehicles', v.id, v);
-                    this.showToast(`Status ${v.plate} diperbarui`, 'success');
+                    this.showToast(`Status ${v.plate} diperbarui: ${v.isAvailable !== false ? 'SIAP' : 'OFF'}`, 'success');
                 },
 
                 toggleDriverAvailability(d) {
                     d.isAvailable = (d.isAvailable === false);
                     localStorage.setItem('uns_schedule_drivers', JSON.stringify(this.drivers));
                     this.saveToFirestore('drivers', d.id, d);
-                    this.showToast(`Status ${d.name} diperbarui`, 'success');
+                    this.showToast(`Status ${d.name} diperbarui: ${d.isAvailable !== false ? 'STANDBY' : 'OFF'}`, 'success');
                 },
 
                 openAddDriverModal() {
@@ -3188,17 +3302,25 @@ Teks memo/pesan: ${this.geminiInputText}`;
 
                 saveWaSettings() {
                     localStorage.setItem('uns_wa_gateway_token', this.waGatewayToken);
-                    this.saveToFirestore('settings', 'config', { waGatewayToken: this.waGatewayToken });
+                    localStorage.setItem('uns_wa_gateway_provider', this.waGatewayProvider);
+                    this.saveToFirestore('settings', 'config', { 
+                        waGatewayToken: this.waGatewayToken,
+                        waGatewayProvider: this.waGatewayProvider
+                    });
                     this.activeWaModal = false;
-                    this.showToast('Pengaturan WA Bot tersimpan!', 'success');
+                    this.showToast('Pengaturan WA Bot tersimpan di Cloud Multi-Device!', 'success');
                 },
 
                 saveGCalSettings() {
                     localStorage.setItem('uns_gcal_webhook_url', this.gcalWebhookUrl);
-                    this.saveToFirestore('settings', 'config', { gcalWebhookUrl: this.gcalWebhookUrl });
+                    localStorage.setItem('uns_gcal_calendar_id', this.gcalCalendarId);
+                    this.saveToFirestore('settings', 'config', { 
+                        gcalWebhookUrl: this.gcalWebhookUrl,
+                        gcalCalendarId: this.gcalCalendarId
+                    });
                     this.activeGCalModal = false;
                     this.startAutoSyncTimer();
-                    this.showToast('URL Google Calendar tersimpan di Cloud & Auto-Sync Aktif!', 'success');
+                    this.showToast('URL Google Calendar tersimpan di Cloud Multi-Device & Auto-Sync Aktif!', 'success');
                     if (this.gcalWebhookUrl) {
                         this.pullEventsFromGoogleCalendar(false);
                     }
