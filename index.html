@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AUTOMAN SCHEDULE UNS - Sistem Penjadwalan & Peminjaman Kendaraan Dinas</title>
+    <title>AUTOMAN SCHEDULE UNS - Sistem Penjadwalan & Peminjaman Kendaraan Dinas (Cloud Realtime & GCal)</title>
 
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -96,26 +96,28 @@
                 <div>
                     <h1 class="font-extrabold text-sm sm:text-base lg:text-lg tracking-tight text-white flex items-center gap-1.5 sm:gap-2">
                         <span><span class="text-sky-400 font-black">SCHEDULE</span> UNS</span>
-                        <span class="text-[9px] sm:text-[10px] bg-sky-950 text-sky-400 border border-sky-800 px-1.5 sm:px-2 py-0.5 rounded-full font-mono uppercase tracking-wider font-bold">Cloud Realtime</span>
+                        <span class="text-[9px] sm:text-[10px] bg-emerald-950 text-emerald-400 border border-emerald-800 px-1.5 sm:px-2 py-0.5 rounded-full font-mono uppercase tracking-wider font-bold">Multi-Device Sync</span>
                     </h1>
-                    <p class="text-[10px] sm:text-[11px] text-slate-400 hidden sm:block">Sistem Penjadwalan & Peminjaman Kendaraan Dinas Terintegrasi UNS</p>
+                    <p class="text-[10px] sm:text-[11px] text-slate-400 hidden sm:block">Sistem Penjadwalan Kendaraan Dinas Terintegrasi Firebase Cloud & Google Calendar</p>
                 </div>
             </div>
 
             <div class="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-                <button @click="forceSyncFromFleetDatabase" class="px-2 sm:px-2.5 py-1 sm:py-1.5 bg-indigo-950/80 hover:bg-indigo-900 border border-indigo-800 text-indigo-300 rounded-xl text-[11px] sm:text-xs font-semibold flex items-center gap-1 transition shadow cursor-pointer" title="Sync DB Master">
-                    <i class="fa-solid fa-arrows-rotate text-sky-400"></i>
-                    <span class="hidden md:inline">Sync DB</span>
+                <!-- CLOUD STATUS INDICATOR -->
+                <button @click="activeCloudModal = true" :class="isCloudConnected ? 'bg-emerald-950/80 border-emerald-800 text-emerald-400' : 'bg-rose-950/80 border-rose-800 text-rose-400'" class="px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl border text-[11px] sm:text-xs font-bold flex items-center gap-1.5 transition cursor-pointer" title="Status Database Firebase Cloud">
+                    <i :class="isCloudConnected ? 'fa-solid fa-cloud-arrow-up text-emerald-400' : 'fa-solid fa-cloud-slash text-rose-400'"></i>
+                    <span class="hidden sm:inline">{{ isCloudConnected ? 'Cloud Online' : 'Connecting...' }}</span>
                 </button>
 
-                <button @click="activeCloudModal = true" :class="cloudStatus === 'connected' ? 'bg-emerald-950/80 border-emerald-800 text-emerald-400' : 'bg-rose-950/80 border-rose-800 text-rose-400'" class="px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-xl border text-[11px] sm:text-xs font-semibold flex items-center gap-1 transition cursor-pointer">
-                    <i :class="cloudStatus === 'connected' ? 'fa-solid fa-cloud-arrow-up text-emerald-400' : 'fa-solid fa-triangle-exclamation'"></i>
-                    <span class="inline">{{ cloudStatus === 'connected' ? 'Cloud' : 'Offline' }}</span>
+                <!-- GCAL SYNC BUTTON -->
+                <button @click="pullEventsFromGoogleCalendar(false)" :disabled="isGCalSyncing" class="px-2.5 sm:px-3 py-1 sm:py-1.5 bg-amber-950/80 hover:bg-amber-900 border border-amber-800 text-amber-300 rounded-xl text-[11px] sm:text-xs font-bold flex items-center gap-1.5 transition shadow cursor-pointer" title="Sync Google Calendar">
+                    <i :class="isGCalSyncing ? 'fa-solid fa-spinner fa-spin text-amber-400' : 'fa-brands fa-google text-amber-400'"></i>
+                    <span class="inline">{{ isGCalSyncing ? 'Syncing...' : 'Sync GCal' }}</span>
                 </button>
 
-                <button v-if="isAdmin" @click="activeGCalModal = true" :class="gcalWebhookUrl ? 'bg-amber-950/80 border-amber-800 text-amber-300' : 'bg-slate-800 border-slate-700 text-slate-400'" class="px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-xl border text-[11px] sm:text-xs font-bold flex items-center gap-1 transition cursor-pointer" title="Google Calendar Auto Sync">
-                    <i class="fa-brands fa-google text-amber-400"></i>
-                    <span class="hidden lg:inline">{{ gcalWebhookUrl ? 'GCal Auto' : 'Google Cal' }}</span>
+                <button @click="activeGCalModal = true" :class="gcalWebhookUrl ? 'bg-emerald-950/80 border-emerald-800 text-emerald-400' : 'bg-rose-950/80 border-rose-800 text-rose-400'" class="px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-xl border text-[11px] sm:text-xs font-bold flex items-center gap-1 transition cursor-pointer" title="Pengaturan Google Calendar">
+                    <i :class="gcalWebhookUrl ? 'fa-solid fa-link text-emerald-400' : 'fa-solid fa-link-slash text-rose-400'"></i>
+                    <span class="hidden sm:inline">{{ gcalWebhookUrl ? 'GCal Aktif' : 'Set Webhook' }}</span>
                 </button>
 
                 <button v-if="isAdmin" @click="activeWaModal = true" :class="waGatewayToken ? 'bg-emerald-950/80 border-emerald-800 text-emerald-400' : 'bg-slate-800 border-slate-700 text-slate-400'" class="px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-xl border text-[11px] sm:text-xs font-bold flex items-center gap-1 transition cursor-pointer" title="WhatsApp Bot Driver">
@@ -166,6 +168,18 @@
                 <span>Jadwal & Agenda Dinas</span>
             </button>
 
+            <!-- TAB PENDING DRIVER ASSIGNMENT -->
+            <button @click="currentTab = 'unassigned'" :class="currentTab === 'unassigned' ? 'bg-amber-600 text-white font-bold shadow-md' : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-200'" class="px-3 sm:px-3.5 py-1.5 rounded-xl text-[11px] sm:text-xs transition flex items-center gap-1.5 sm:gap-2 cursor-pointer shrink-0">
+                <i class="fa-solid fa-user-clock text-amber-300"></i>
+                <span>Plotting Driver</span>
+                <span v-if="unassignedBookingsCount > 0" class="ml-1 px-1.5 py-0.2 bg-rose-500 text-white rounded-full font-black text-[10px] animate-pulse">{{ unassignedBookingsCount }}</span>
+            </button>
+
+            <button @click="currentTab = 'recap'" :class="currentTab === 'recap' ? 'bg-sky-600 text-white font-bold shadow-md' : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-200'" class="px-3 sm:px-3.5 py-1.5 rounded-xl text-[11px] sm:text-xs transition flex items-center gap-1.5 sm:gap-2 cursor-pointer shrink-0">
+                <i class="fa-solid fa-chart-line text-amber-400"></i>
+                <span>Rekap & Beban Kerja Driver</span>
+            </button>
+
             <button v-if="isAdmin" @click="currentTab = 'requests'" :class="currentTab === 'requests' ? 'bg-sky-600 text-white font-bold shadow-md' : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-200'" class="px-3 sm:px-3.5 py-1.5 rounded-xl text-[11px] sm:text-xs transition flex items-center gap-1.5 sm:gap-2 cursor-pointer shrink-0">
                 <i class="fa-solid fa-list-check"></i>
                 <span>Daftar Peminjaman</span>
@@ -175,11 +189,6 @@
             <button v-if="isAdmin" @click="currentTab = 'fleet'" :class="currentTab === 'fleet' ? 'bg-sky-600 text-white font-bold shadow-md' : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-200'" class="px-3 sm:px-3.5 py-1.5 rounded-xl text-[11px] sm:text-xs transition flex items-center gap-1.5 sm:gap-2 cursor-pointer shrink-0">
                 <i class="fa-solid fa-car-side"></i>
                 <span>Ketersediaan Armada & Driver</span>
-            </button>
-
-            <button v-if="isAdmin" @click="currentTab = 'recap'" :class="currentTab === 'recap' ? 'bg-sky-600 text-white font-bold shadow-md' : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-200'" class="px-3 sm:px-3.5 py-1.5 rounded-xl text-[11px] sm:text-xs transition flex items-center gap-1.5 sm:gap-2 cursor-pointer shrink-0">
-                <i class="fa-solid fa-chart-line"></i>
-                <span>Rekap & Laporan Dinas</span>
             </button>
         </nav>
 
@@ -237,7 +246,6 @@
                 </div>
             </div>
 
-            <!-- TAB 1: KALENDER BULANAN -->
             <section v-if="currentTab === 'calendar'" class="space-y-4 smooth-render">
                 <div class="bg-slate-900 p-4 rounded-2xl border border-slate-800 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 shadow-xl">
                     <div class="flex items-center gap-3">
@@ -247,9 +255,9 @@
                         <div>
                             <h2 class="font-extrabold text-base text-white flex items-center gap-2">
                                 <span>Kalender Penjadwalan Kendaraan Dinas UNS</span>
-                                <span class="text-xs font-mono font-bold px-2 py-0.5 bg-sky-950 text-sky-400 border border-sky-800 rounded-lg">{{ calMonthName }} {{ calYear }}</span>
+                                <span class="text-xs font-mono font-bold px-2 py-0.5 bg-amber-950 text-amber-400 border border-amber-800 rounded-lg">{{ calMonthName }} {{ calYear }}</span>
                             </h2>
-                            <p class="text-xs text-slate-400">Tampilan timeline interaktif bulanan dengan pita kegiatan memanjang multi-hari</p>
+                            <p class="text-xs text-slate-400">Sinkronisasi otomatis Firebase Cloud & Google Calendar multi-perangkat</p>
                         </div>
                     </div>
 
@@ -284,7 +292,7 @@
                     <div class="min-w-[620px] sm:min-w-[750px] space-y-1 bg-slate-950 p-0.5 sm:p-1 border border-slate-800 rounded-xl">
                         <div v-for="week in calendarWeeks" :key="week.weekIndex" class="relative bg-slate-900/60 rounded-xl border border-slate-800/80 mb-1 overflow-hidden">
                             
-                            <!-- DAY CELL BACKGROUND GRID (7 COLUMNS) -->
+                            <!-- DAY CELL BACKGROUND GRID -->
                             <div class="grid grid-cols-7 min-h-[120px] sm:min-h-[175px] divide-x divide-slate-800/50">
                                 <div v-for="(day, dIdx) in week.days" :key="dIdx"
                                      @click="day.isCurrentMonth && handleDayCellClick(day)"
@@ -307,7 +315,7 @@
                                         </span>
                                     </div>
 
-                                    <!-- OVERFLOW COUNTER ("X lainnya") AT BOTTOM OF CELL -->
+                                    <!-- OVERFLOW COUNTER -->
                                     <div class="mt-auto z-10 pt-0.5">
                                         <span v-if="day.overflowCount > 0" class="text-[8px] sm:text-[9px] font-mono font-black text-slate-300 hover:text-sky-300 block">
                                             {{ day.overflowCount }} lainnya
@@ -316,10 +324,10 @@
                                 </div>
                             </div>
 
-                            <!-- MULTI-DAY SPANNING EVENTS OVERLAY LAYER (PRE-COMPUTED FAST RENDER) -->
+                            <!-- MULTI-DAY SPANNING EVENTS OVERLAY LAYER -->
                             <div class="absolute top-5 sm:top-7 left-0 right-0 bottom-0 grid grid-cols-7 gap-y-[1px] sm:gap-y-[2px] px-0.5 pointer-events-none z-20">
                                 <div v-for="item in week.visibleEvents" :key="item.b.id + '-' + week.weekIndex"
-                                     @click.stop="openTicketModal(item.b)"
+                                     @click.stop="openEditBookingModal(item.b)"
                                      :style="{ gridColumn: (item.startIndex + 1) + ' / span ' + item.span, gridRow: item.slot }"
                                      :class="[
                                         item.badgeStyle,
@@ -327,18 +335,88 @@
                                         item.isEndOfBooking ? 'rounded-r-lg pr-1.5 sm:pr-2' : 'rounded-r-none border-r-0 pr-1',
                                         'pointer-events-auto h-[18px] sm:h-[21px] text-[8px] sm:text-[10px] font-bold leading-none truncate shadow-md transition hover:brightness-125 cursor-pointer flex items-center gap-1 z-20 border border-slate-950/40'
                                      ]"
-                                     :title="item.label">
+                                     :title="'Klik untuk Edit: ' + item.label">
                                     <i v-if="item.isStartOfBooking" class="fa-solid fa-car text-[8px] sm:text-[9px] opacity-80 shrink-0"></i>
                                     <span class="truncate">{{ item.label }}</span>
                                 </div>
                             </div>
-
                         </div>
                     </div>
                 </div>
             </section>
 
-            <!-- TAB 2: INSPECTOR AVAILABILITY -->
+            <!-- TAB FOR UNASSIGNED DRIVER PLOTTING -->
+            <section v-if="currentTab === 'unassigned'" class="space-y-4">
+                <div class="bg-slate-900 p-4 rounded-2xl border border-slate-800 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 shadow-xl">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center font-bold text-lg">
+                            <i class="fa-solid fa-user-clock"></i>
+                        </div>
+                        <div>
+                            <h2 class="font-extrabold text-base text-white flex items-center gap-2">
+                                <span>Plotting Driver (Belum Ditentukan)</span>
+                                <span class="text-xs font-mono font-bold px-2 py-0.5 bg-rose-950 text-rose-300 border border-rose-800 rounded-lg">{{ unassignedBookingsCount }} Agenda Perlu Driver</span>
+                            </h2>
+                            <p class="text-xs text-slate-400">Daftar agenda dinas dari Google Calendar / Pengajuan yang belum memiliki Driver yang ditugaskan</p>
+                        </div>
+                    </div>
+
+                    <!-- SORT CONTROLS -->
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs text-slate-400 font-semibold"><i class="fa-solid fa-sort text-amber-400 mr-1"></i>Urutkan:</span>
+                        <select v-model="unassignedSortOrder" class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white font-bold focus:border-amber-500 focus:outline-none">
+                            <option value="NEAREST">📅 Terdekat (Hari Ini → Mendatang)</option>
+                            <option value="FURTHEST">⌛ Terlama / Terjauh</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div v-if="unassignedBookings.length > 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                    <div v-for="b in unassignedBookings" :key="b.id" class="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3 shadow-lg flex flex-col justify-between">
+                        <div class="space-y-2">
+                            <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+                                <span class="px-2.5 py-0.5 bg-slate-950 text-sky-400 font-mono font-bold text-xs rounded uppercase border border-slate-800">
+                                    <i class="fa-solid fa-car mr-1"></i>{{ getVehiclePlate(b.vehicleId) }}
+                                </span>
+                                <span class="px-2 py-0.5 bg-rose-950/90 text-rose-300 border border-rose-800 rounded-full text-[10px] font-bold font-mono">
+                                    <i class="fa-solid fa-triangle-exclamation mr-1"></i>Driver Belum Plotting
+                                </span>
+                            </div>
+
+                            <div class="text-xs space-y-1.5">
+                                <p class="text-white font-extrabold text-sm">{{ b.applicantName }} <span class="text-sky-400 font-normal">({{ b.unit }})</span></p>
+                                <p class="text-amber-300 font-bold"><i class="fa-solid fa-location-dot text-rose-400 mr-1.5"></i>{{ b.destination }}</p>
+                                <p class="text-slate-400 text-[11px] truncate" :title="b.purpose"><i class="fa-solid fa-circle-info mr-1.5 text-slate-500"></i>{{ b.purpose }}</p>
+                                <p class="text-slate-300 text-[10px] font-mono bg-slate-950 p-2 rounded-xl border border-slate-800/80">
+                                    <i class="fa-solid fa-clock text-amber-400 mr-1"></i>{{ formatDateTimeWib(b.startDate) }} <br>
+                                    <span class="text-slate-500">s/d</span> {{ formatDateTimeWib(b.endDate) }}
+                                </p>
+                            </div>
+                        </div>
+
+                        <div class="pt-2 border-t border-slate-800/80 space-y-2">
+                            <label class="block text-[10px] font-bold uppercase tracking-wider text-amber-400">Pilih & Penugasan Driver *</label>
+                            <div class="flex items-center gap-2">
+                                <select v-model="b.driverId" class="flex-1 bg-slate-950 border border-slate-800 rounded-xl p-2 text-xs text-white font-bold focus:border-amber-500 focus:outline-none">
+                                    <option value="">-- Pilih Driver Standby --</option>
+                                    <option v-for="d in activeDrivers" :key="d.id" :value="d.id">
+                                        {{ d.name }} {{ isDriverBusy(d.id, b.startDate, b.endDate, b.id) ? '⚠️ (Bentrok)' : '✅ (Standby)' }}
+                                    </option>
+                                </select>
+                                <button @click="assignDriverAndSync(b)" :disabled="!b.driverId" class="px-3 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-800 disabled:text-slate-500 text-white rounded-xl font-bold text-xs shadow transition cursor-pointer shrink-0">
+                                    <i class="fa-solid fa-check mr-1"></i>Plotting
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div v-else class="bg-slate-900 border border-slate-800 rounded-2xl p-12 text-center text-slate-500 text-xs">
+                    <i class="fa-solid fa-circle-check text-3xl text-emerald-400 block mb-2"></i>
+                    <span>Semua agenda dinas sudah memiliki driver yang ditugaskan!</span>
+                </div>
+            </section>
+
             <section v-if="currentTab === 'inspector'" class="space-y-4">
                 <div class="bg-slate-900 p-4 rounded-2xl border border-slate-800 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 shadow-xl">
                     <div class="flex items-center gap-3">
@@ -438,7 +516,6 @@
                 </div>
             </section>
 
-            <!-- TAB 3: SCHEDULE TIMELINE -->
             <section v-if="currentTab === 'schedule'" class="space-y-4">
                 <div class="bg-slate-900 p-4 rounded-xl border border-slate-800 flex justify-between items-center">
                     <h2 class="font-extrabold text-base text-white">Jadwal Perjalanan Dinas Aktif</h2>
@@ -465,7 +542,87 @@
                 <div v-else class="bg-slate-900 border border-slate-800 rounded-2xl p-8 text-center text-slate-500 text-xs">Tidak ada jadwal perjalanan dinas pada tanggal ini.</div>
             </section>
 
-            <!-- TAB 4: REQUESTS LIST (ADMIN ONLY) -->
+            <section v-if="currentTab === 'recap'" class="space-y-4">
+                <div class="bg-slate-900 p-4 rounded-xl border border-slate-800 flex justify-between items-center flex-wrap gap-2">
+                    <div>
+                        <h2 class="font-extrabold text-base text-white flex items-center gap-2">
+                            <i class="fa-solid fa-chart-line text-amber-400"></i>
+                            <span>Rekapitulasi Pemakaian & Beban Kerja Driver Ready</span>
+                        </h2>
+                        <p class="text-xs text-slate-400">Perhitungan dilakukan secara presisi dari data cloud real-time yang tersinkronisasi</p>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <select v-model="recapMonth" class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white font-bold">
+                            <option v-for="m in 12" :key="m" :value="m">{{ getMonthName(m) }}</option>
+                        </select>
+                        <select v-model="recapYear" class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white font-bold">
+                            <option :value="2025">2025</option>
+                            <option :value="2026">2026</option>
+                            <option :value="2027">2027</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- ALGORITHM EXPLANATION CARD -->
+                <div class="bg-slate-900/90 border border-amber-500/30 rounded-2xl p-4 sm:p-5 shadow-xl space-y-3">
+                    <h3 class="font-extrabold text-sm text-amber-300 flex items-center gap-2">
+                        <i class="fa-solid fa-calculator text-amber-400"></i>
+                        <span>Rumus & Algoritma Penilaian Keadilan Beban Kerja Driver</span>
+                    </h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs leading-relaxed">
+                        <div class="bg-slate-950 p-3 rounded-xl border border-slate-800">
+                            <p class="font-bold text-sky-400 mb-1">1. Hari Tugas Dalam Kota (≤ 40 KM 1-Way)</p>
+                            <p class="text-slate-300 text-[11px]">Setiap agenda dinas ke lokasi berjarak ≤ 40 KM dari Kampus UNS Kentingan dihitung sebagai dinas Dalam Kota. Mengurangi akumulasi kelelahan driver luar kota.</p>
+                        </div>
+                        <div class="bg-slate-950 p-3 rounded-xl border border-slate-800">
+                            <p class="font-bold text-emerald-400 mb-1">2. Hari Tugas Luar Kota (> 40 KM 1-Way)</p>
+                            <p class="text-slate-300 text-[11px]">Perjalanan antar kota (Yogyakarta, Semarang, Surabaya, Jakarta, dll) dengan jarak > 40 KM. Menghitung akumulasi kilometer Pulang-Pergi (PP).</p>
+                        </div>
+                        <div class="bg-slate-950 p-3 rounded-xl border border-slate-800">
+                            <p class="font-bold text-purple-400 mb-1">3. Indikator Keadilan & Rotasi</p>
+                            <p class="text-slate-300 text-[11px]">• <span class="text-emerald-400 font-bold">Normal / Seimbang</span>: 1 - 9 hari bertugas/bulan.<br>• <span class="text-rose-400 font-bold">Beban Tinggi</span>: ≥ 10 hari bertugas/bulan (Rekomendasi rotasi ke driver standby lainnya).</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs text-slate-300">
+                            <thead class="bg-slate-950 text-slate-400 uppercase font-mono border-b border-slate-800 text-[10px]">
+                                <tr>
+                                    <th class="p-3">Driver / Sopir Ready (Klik Rincian)</th>
+                                    <th class="p-3 text-center">Total Hari Bertugas</th>
+                                    <th class="p-3 text-center">Hari Dalam Kota<br><span class="text-[8px] text-slate-500 font-normal lowercase">(≤40 KM Sekali Jalan / ≤80 KM PP)</span></th>
+                                    <th class="p-3 text-center">Hari Luar Kota<br><span class="text-[8px] text-slate-500 font-normal lowercase">(>40 KM Sekali Jalan / >80 KM PP)</span></th>
+                                    <th class="p-3 text-right">Estimasi Jarak (KM PP)</th>
+                                    <th class="p-3 text-center">Indikator Keadilan</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-800/80 font-medium">
+                                <tr v-for="stats in driverRecapStats" :key="stats.driver.id" class="hover:bg-slate-800/40 transition">
+                                    <td class="p-3">
+                                        <div @click="openDriverDetailModal(stats)" class="group cursor-pointer">
+                                            <div class="font-bold text-white text-sm group-hover:text-sky-400 transition flex items-center gap-1.5">
+                                                <span>{{ stats.driver.name }}</span>
+                                                <span class="text-[9px] px-1.5 py-0.2 bg-sky-950 text-sky-400 border border-sky-800 rounded font-mono font-normal opacity-80 group-hover:opacity-100">
+                                                    <i class="fa-solid fa-list-ul mr-0.5"></i> Detail
+                                                </span>
+                                            </div>
+                                            <div class="text-[10px] text-slate-400 font-mono"><i class="fa-brands fa-whatsapp text-emerald-400 mr-1"></i>{{ stats.driver.phone || '-' }}</div>
+                                        </div>
+                                    </td>
+                                    <td class="p-3 text-center font-mono font-black text-amber-300 text-sm">{{ stats.totalActiveDays }} Hari</td>
+                                    <td class="p-3 text-center font-mono text-sky-400 font-bold">{{ stats.cityActiveDays }} Hari</td>
+                                    <td class="p-3 text-center font-mono text-emerald-400 font-bold">{{ stats.outstationActiveDays }} Hari</td>
+                                    <td class="p-3 text-right font-mono font-bold text-slate-200">{{ stats.totalKm.toLocaleString('id-ID') }} KM</td>
+                                    <td class="p-3 text-center"><span :class="stats.badgeClass" class="px-2.5 py-1 rounded-full text-[10px] font-black font-mono">{{ stats.statusText }}</span></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
             <section v-if="currentTab === 'requests' && isAdmin" class="space-y-4">
                 <div class="bg-slate-900 p-4 rounded-xl border border-slate-800 flex flex-col md:flex-row justify-between items-stretch md:items-center gap-3">
                     <h2 class="font-extrabold text-base text-white">Daftar Pengajuan Peminjaman Kendaraan Dinas</h2>
@@ -542,7 +699,6 @@
                 </div>
             </section>
 
-            <!-- TAB 5: FLEET & DRIVER AVAILABILITY (ADMIN ONLY) -->
             <section v-if="currentTab === 'fleet' && isAdmin" class="space-y-4">
                 <div class="bg-slate-900 p-4 rounded-xl border border-slate-800 flex justify-between items-center flex-wrap gap-2">
                     <h2 class="font-extrabold text-base text-white"><i class="fa-solid fa-car-side text-sky-400 mr-2"></i>Pengaturan Ketersediaan Armada & Driver</h2>
@@ -617,66 +773,8 @@
                 </div>
             </section>
 
-            <!-- TAB 6: RECAP & WORKLOAD (ADMIN ONLY) -->
-            <section v-if="currentTab === 'recap' && isAdmin" class="space-y-4">
-                <div class="bg-slate-900 p-4 rounded-xl border border-slate-800 flex justify-between items-center flex-wrap gap-2">
-                    <div>
-                        <h2 class="font-extrabold text-base text-white"><i class="fa-solid fa-chart-line text-sky-400 mr-2"></i>Rekapitulasi Pemakaian & Beban Kerja Driver Ready</h2>
-                        <p class="text-xs text-slate-400">Klik pada nama driver untuk melihat rincian detail daftar tugas dinas bulan ini</p>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <select v-model="recapMonth" class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white font-bold">
-                            <option v-for="m in 12" :key="m" :value="m">{{ getMonthName(m) }}</option>
-                        </select>
-                        <select v-model="recapYear" class="bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white font-bold">
-                            <option :value="2025">2025</option>
-                            <option :value="2026">2026</option>
-                            <option :value="2027">2027</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-left text-xs text-slate-300">
-                            <thead class="bg-slate-950 text-slate-400 uppercase font-mono border-b border-slate-800 text-[10px]">
-                                <tr>
-                                    <th class="p-3">Driver / Sopir Ready (Klik Rincian)</th>
-                                    <th class="p-3 text-center">Total Hari Bertugas</th>
-                                    <th class="p-3 text-center">Hari Dalam Kota<br><span class="text-[8px] text-slate-500 font-normal lowercase">(≤40 KM Sekali Jalan / ≤80 KM PP)</span></th>
-                                    <th class="p-3 text-center">Hari Luar Kota<br><span class="text-[8px] text-slate-500 font-normal lowercase">(>40 KM Sekali Jalan / >80 KM PP)</span></th>
-                                    <th class="p-3 text-right">Estimasi Jarak (KM PP)</th>
-                                    <th class="p-3 text-center">Indikator Keadilan</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-slate-800/80 font-medium">
-                                <tr v-for="stats in driverRecapStats" :key="stats.driver.id" class="hover:bg-slate-800/40 transition">
-                                    <td class="p-3">
-                                        <div @click="openDriverDetailModal(stats)" class="group cursor-pointer">
-                                            <div class="font-bold text-white text-sm group-hover:text-sky-400 transition flex items-center gap-1.5">
-                                                <span>{{ stats.driver.name }}</span>
-                                                <span class="text-[9px] px-1.5 py-0.2 bg-sky-950 text-sky-400 border border-sky-800 rounded font-mono font-normal opacity-80 group-hover:opacity-100">
-                                                    <i class="fa-solid fa-list-ul mr-0.5"></i> Detail
-                                                </span>
-                                            </div>
-                                            <div class="text-[10px] text-slate-400 font-mono"><i class="fa-brands fa-whatsapp text-emerald-400 mr-1"></i>{{ stats.driver.phone || '-' }}</div>
-                                        </div>
-                                    </td>
-                                    <td class="p-3 text-center font-mono font-black text-amber-300 text-sm">{{ stats.totalActiveDays }} Hari</td>
-                                    <td class="p-3 text-center font-mono text-sky-400 font-bold">{{ stats.cityActiveDays }} Hari</td>
-                                    <td class="p-3 text-center font-mono text-emerald-400 font-bold">{{ stats.outstationActiveDays }} Hari</td>
-                                    <td class="p-3 text-right font-mono font-bold text-slate-200">{{ stats.totalKm.toLocaleString('id-ID') }} KM</td>
-                                    <td class="p-3 text-center"><span :class="stats.badgeClass" class="px-2.5 py-1 rounded-full text-[10px] font-black font-mono">{{ stats.statusText }}</span></td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </section>
-
         </main>
 
-        <!-- MOBILE BOTTOM NAVIGATION BAR -->
         <nav class="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-slate-900/95 backdrop-blur-md border-t border-slate-800 px-2 py-1.5 flex items-center justify-around no-print shadow-2xl">
             <button @click="currentTab = 'calendar'" :class="currentTab === 'calendar' ? 'text-sky-400 font-bold' : 'text-slate-400'" class="flex flex-col items-center gap-0.5 p-1 text-[10px] cursor-pointer">
                 <i class="fa-solid fa-calendar-days text-base"></i>
@@ -690,24 +788,17 @@
                 <i class="fa-solid fa-list-timeline text-base"></i>
                 <span>Jadwal</span>
             </button>
+            <button @click="currentTab = 'recap'" :class="currentTab === 'recap' ? 'text-amber-400 font-bold' : 'text-slate-400'" class="flex flex-col items-center gap-0.5 p-1 text-[10px] cursor-pointer">
+                <i class="fa-solid fa-chart-line text-base"></i>
+                <span>Rekap</span>
+            </button>
             <button v-if="isAdmin" @click="currentTab = 'requests'" :class="currentTab === 'requests' ? 'text-sky-400 font-bold' : 'text-slate-400'" class="flex flex-col items-center gap-0.5 p-1 text-[10px] cursor-pointer relative">
                 <i class="fa-solid fa-list-check text-base"></i>
                 <span>Pengajuan</span>
                 <span v-if="pendingBookingsCount > 0" class="absolute -top-1 right-1 px-1 py-0.2 bg-amber-500 text-slate-950 rounded-full font-black text-[9px]">{{ pendingBookingsCount }}</span>
             </button>
-            <button v-if="isAdmin" @click="currentTab = 'fleet'" :class="currentTab === 'fleet' ? 'text-sky-400 font-bold' : 'text-slate-400'" class="flex flex-col items-center gap-0.5 p-1 text-[10px] cursor-pointer">
-                <i class="fa-solid fa-car-side text-base"></i>
-                <span>Armada</span>
-            </button>
-            <button v-if="isAdmin" @click="currentTab = 'recap'" :class="currentTab === 'recap' ? 'text-sky-400 font-bold' : 'text-slate-400'" class="flex flex-col items-center gap-0.5 p-1 text-[10px] cursor-pointer">
-                <i class="fa-solid fa-chart-line text-base"></i>
-                <span>Rekap</span>
-            </button>
         </nav>
 
-        <!-- ALL MODALS AREA -->
-
-        <!-- MODAL 1: DETAIL RINCIAN TUGAS DRIVER -->
         <div v-if="activeDriverDetailModal && selectedDriverDetail" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
             <div class="bg-slate-900 border border-slate-800 w-full max-w-3xl rounded-2xl p-5 sm:p-6 shadow-2xl space-y-4 my-auto">
                 <div class="flex items-center justify-between border-b border-slate-800 pb-3">
@@ -809,7 +900,6 @@
             </div>
         </div>
 
-        <!-- MODAL 2: KOTAK TANGGAL DIKLIK -->
         <div v-if="activeDayClickModal && selectedDayData" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
             <div class="bg-slate-900 border border-slate-800 w-full max-w-md rounded-2xl p-5 sm:p-6 shadow-2xl space-y-4">
                 <div class="flex items-center justify-between border-b border-slate-800 pb-3">
@@ -851,7 +941,6 @@
             </div>
         </div>
 
-        <!-- MODAL 3: AJUKAN / EDIT PEMINJAMAN -->
         <div v-if="activeBookingModal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto">
             <div class="bg-slate-900 border-t sm:border border-slate-800 w-full max-w-xl rounded-t-2xl sm:rounded-2xl p-5 sm:p-6 shadow-2xl space-y-4 my-auto">
                 <div class="flex items-center justify-between border-b border-slate-800 pb-3">
@@ -984,13 +1073,12 @@
 
                     <div class="flex justify-end gap-2 pt-3 border-t border-slate-800">
                         <button type="button" @click="activeBookingModal = false" class="px-3.5 py-2 bg-slate-800 text-slate-300 rounded-xl font-bold cursor-pointer">Batal</button>
-                        <button type="submit" class="px-5 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-xl font-bold shadow-lg shadow-sky-600/20 cursor-pointer">Simpan Permohonan</button>
+                        <button type="submit" class="px-5 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-xl font-bold shadow-lg shadow-sky-600/20 cursor-pointer">Simpan & Sync Cloud/GCal</button>
                     </div>
                 </form>
             </div>
         </div>
 
-        <!-- MODAL 4: APPROVAL ADMIN -->
         <div v-if="activeApprovalModal && selectedBooking" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
             <div class="bg-slate-900 border border-slate-800 w-full max-w-lg rounded-2xl p-5 sm:p-6 shadow-2xl space-y-4">
                 <div class="flex items-center justify-between border-b border-slate-800 pb-3">
@@ -1044,25 +1132,25 @@
             </div>
         </div>
 
-        <!-- MODAL 5: GOOGLE CALENDAR SETTINGS -->
         <div v-if="activeGCalModal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
             <div class="bg-slate-900 border border-slate-800 w-full max-w-lg rounded-2xl p-5 sm:p-6 shadow-2xl space-y-4 my-auto">
                 <div class="flex items-center justify-between border-b border-slate-800 pb-3">
                     <div class="flex items-center gap-2">
                         <i class="fa-brands fa-google text-amber-400 text-lg"></i>
-                        <h3 class="font-extrabold text-sm text-white">Google Calendar Auto 2-Way Sync</h3>
+                        <h3 class="font-extrabold text-sm text-white">Google Calendar Auto 2-Way Sync Engine</h3>
                     </div>
                     <button @click="activeGCalModal = false" class="text-slate-400 hover:text-white cursor-pointer"><i class="fa-solid fa-xmark"></i></button>
                 </div>
                 <div class="space-y-3 text-xs">
-                    <div class="bg-emerald-950/60 border border-emerald-800/80 p-3 rounded-xl space-y-1">
-                        <p class="font-bold text-emerald-300 flex items-center gap-1.5">
-                            <i class="fa-solid fa-arrows-rotate animate-spin text-emerald-400"></i>
-                            <span>Sinkronisasi Otomatis Cloud Terintegrasi</span>
+                    <div class="bg-amber-950/60 border border-amber-800/80 p-3 rounded-xl space-y-1 text-amber-200">
+                        <p class="font-bold flex items-center gap-1.5 text-amber-300">
+                            <i class="fa-solid fa-triangle-exclamation text-amber-400"></i>
+                            <span>Penting: Pengaturan Deployment Apps Script</span>
                         </p>
-                        <p class="text-[11px] text-slate-300 leading-relaxed">
-                            • <strong>Auto Sync Cloud:</strong> URL Webhook ini tersimpan otomatis di Firebase Cloud Database.<br>
-                            • <strong>2-Way Automatic:</strong> Aplikasi & GCal bertukar data otomatis setiap 60 detik.
+                        <p class="text-[11px] leading-relaxed">
+                            Agar tidak terjadi error <strong>Failed to fetch / CORS</strong>, pastikan saat Deploy Google Apps Script Anda mengatur:<br>
+                            • <strong>Execute as (Jalankan sebagai):</strong> Me (Saya)<br>
+                            • <strong>Who has access (Akses):</strong> Anyone / Siapa saja (bahkan anonim)
                         </p>
                     </div>
 
@@ -1079,55 +1167,166 @@
                     </div>
 
                     <div class="space-y-1.5 pt-2 border-t border-slate-800">
-                        <p class="font-bold text-amber-300">Kode Google Apps Script Presisi (Deploy Web App):</p>
+                        <p class="font-bold text-amber-300">Kode Google Apps Script Presisi (Dukungan JSONP & CORS):</p>
                         <textarea readonly rows="6" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2 font-mono text-[10px] text-slate-400 select-all focus:outline-none" onclick="this.select();">
-function doGet(e){return handleReq(e)}
-function doPost(e){return handleReq(e)}
+function doGet(e){ return handleReq(e); }
+function doPost(e){ return handleReq(e); }
+
 function handleReq(e){
-  var p=e.parameter||{},d={};try{d=JSON.parse(e.postData.contents)}catch(err){}
-  var act=p.action||d.action, cal=CalendarApp.getCalendarById(p.calendarId||d.calendarId||'primary')||CalendarApp.getDefaultCalendar();
+  var p = (e && e.parameter) ? e.parameter : {};
+  var d = {};
+  if (e && e.postData && e.postData.contents) {
+    try { d = JSON.parse(e.postData.contents); } catch(err){}
+  }
+  
+  var act = p.action || d.action || 'fetchEvents';
+  var calId = p.calendarId || d.calendarId || 'primary';
+  var cal = CalendarApp.getCalendarById(calId) || CalendarApp.getDefaultCalendar();
   var tz = Session.getScriptTimeZone() || "Asia/Jakarta";
-  if(act==='fetchEvents'){
-    var now=new Date();
-    var startRange = new Date(now.getTime() - 365*86400000);
-    var endRange = new Date(now.getTime() + 365*86400000);
+  var cb = p.callback || d.callback;
+
+  function makeResponse(obj) {
+    var jsonStr = JSON.stringify(obj);
+    if (cb) {
+      return ContentService.createTextOutput(cb + '(' + jsonStr + ')')
+        .setMimeType(ContentService.MimeType.JAVASCRIPT);
+    }
+    return ContentService.createTextOutput(jsonStr)
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
+  if (act === 'fetchEvents') {
+    var now = new Date();
+    var pastDays = parseInt(p.pastDays || d.pastDays || 365);
+    var futureDays = parseInt(p.futureDays || d.futureDays || 365);
+    var startRange = new Date(now.getTime() - pastDays * 86400000);
+    var endRange = new Date(now.getTime() + futureDays * 86400000);
+    
     var evs = cal.getEvents(startRange, endRange);
     var res = evs.map(function(x){
       var isAllDay = x.isAllDayEvent();
       var st = x.getStartTime(), et = x.getEndTime();
-      if(isAllDay){ et = new Date(et.getTime() - 60000); }
+      if (isAllDay && et > st) {
+        et = new Date(et.getTime() - 60000);
+      }
+      
+      var desc = x.getDescription() || '';
+      var automanId = '';
+      var match = desc.match(/\[AUTOMAN_ID:\s*([^\]]+)\]/);
+      if (match) { automanId = match[1].trim(); }
+
       return {
-        id: x.getId(), title: x.getTitle(), description: x.getDescription()||'', location: x.getLocation()||'',
+        id: x.getId(),
+        automanId: automanId,
+        title: x.getTitle(),
+        description: desc,
+        location: x.getLocation() || '',
         startDate: Utilities.formatDate(st, tz, "yyyy-MM-dd'T'HH:mm"),
         endDate: Utilities.formatDate(et, tz, "yyyy-MM-dd'T'HH:mm"),
         isAllDay: isAllDay
       };
     });
-    return ContentService.createTextOutput(JSON.stringify({status:'success',events:res})).setMimeType(ContentService.MimeType.JSON);
+    return makeResponse({status:'success', events:res});
   }
-  if(act==='upsertEvent'){
-    var ev=d.event||{}, start=new Date(ev.startDate), end=new Date(ev.endDate);
-    var found=cal.getEvents(start,end,{search:ev.id});
-    if(found.length>0){ found[0].setTitle(ev.title); found[0].setDescription(ev.description); found[0].setLocation(ev.location); }
-    else { cal.createEvent(ev.title,start,end,{description:ev.description,location:ev.location}); }
-    return ContentService.createTextOutput(JSON.stringify({status:'success'})).setMimeType(ContentService.MimeType.JSON);
+
+  if (act === 'upsertEvent') {
+    var ev = d.event || {};
+    var targetId = ev.id || '';
+    if (!ev.startDate || !ev.endDate) {
+      return makeResponse({status:'error', message:'Missing dates'});
+    }
+
+    var start = new Date(ev.startDate);
+    var end = new Date(ev.endDate);
+    var descWithId = (ev.description || '') + "\n\n[AUTOMAN_ID: " + targetId + "]";
+    
+    var searchStart = new Date(start.getTime() - 7 * 86400000);
+    var searchEnd = new Date(end.getTime() + 7 * 86400000);
+    var existingEvs = cal.getEvents(searchStart, searchEnd);
+    var found = null;
+
+    for (var i = 0; i < existingEvs.length; i++) {
+      var item = existingEvs[i];
+      if (item.getId() === targetId || (item.getDescription() && item.getDescription().indexOf("[AUTOMAN_ID: " + targetId + "]") !== -1)) {
+        found = item;
+        break;
+      }
+    }
+
+    if (found) {
+      found.setTitle(ev.title || 'Dinas UNS');
+      found.setDescription(descWithId);
+      found.setLocation(ev.location || '');
+      found.setTime(start, end);
+    } else {
+      cal.createEvent(ev.title || 'Dinas UNS', start, end, {
+        description: descWithId,
+        location: ev.location || ''
+      });
+    }
+    return makeResponse({status:'success'});
   }
-  if(act==='deleteEvent'){
-    var id=d.id||p.id; if(id){ var all=cal.getEvents(new Date(2025,0,1),new Date(2028,0,1)); all.forEach(function(x){if(x.getId()===id||x.getDescription().indexOf(id)!==-1){x.deleteEvent()}})}
-    return ContentService.createTextOutput(JSON.stringify({status:'success'})).setMimeType(ContentService.MimeType.JSON);
+
+  if (act === 'deleteEvent') {
+    var delId = d.id || p.id;
+    if (delId) {
+      var now = new Date();
+      var allEvs = cal.getEvents(new Date(now.getTime() - 365*86400000), new Date(now.getTime() + 365*86400000));
+      allEvs.forEach(function(x){
+        if (x.getId() === delId || (x.getDescription() && x.getDescription().indexOf("[AUTOMAN_ID: " + delId + "]") !== -1)) {
+          x.deleteEvent();
+        }
+      });
+    }
+    return makeResponse({status:'success'});
   }
-  return ContentService.createTextOutput(JSON.stringify({status:'error'})).setMimeType(ContentService.MimeType.JSON);
+
+  return makeResponse({status:'error', message:'Invalid action'});
 }</textarea>
                     </div>
 
                     <div class="flex justify-end gap-2 pt-2 border-t border-slate-800">
-                        <button type="button" @click="saveGCalSettings" class="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-xl font-bold shadow cursor-pointer">Simpan Ke Cloud & Aktifkan Sync</button>
+                        <button type="button" @click="saveGCalSettings" class="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-xl font-bold shadow cursor-pointer">Simpan URL & Aktifkan Auto-Sync</button>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- MODAL 6: WA BOT SETTINGS -->
+        <div v-if="activeCloudModal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+            <div class="bg-slate-900 border border-slate-800 w-full max-w-md rounded-2xl p-5 sm:p-6 shadow-2xl space-y-4">
+                <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                    <div class="flex items-center gap-2">
+                        <i class="fa-solid fa-cloud-arrow-up text-emerald-400 text-xl"></i>
+                        <h3 class="font-extrabold text-sm sm:text-base text-white">Status Realtime Cloud Sync</h3>
+                    </div>
+                    <button @click="activeCloudModal = false" class="text-slate-400 hover:text-white cursor-pointer"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+
+                <div class="space-y-3 text-xs">
+                    <div class="bg-emerald-950/60 border border-emerald-800/80 p-3 rounded-xl space-y-2">
+                        <div class="flex justify-between items-center">
+                            <span class="text-slate-300 font-semibold">Koneksi Database Cloud:</span>
+                            <span :class="isCloudConnected ? 'text-emerald-400 font-bold' : 'text-amber-400 font-bold'" class="font-mono">
+                                {{ isCloudConnected ? '🟢 TERHUBUNG (Realtime)' : '🟡 Menyambungkan...' }}
+                            </span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-slate-300 font-semibold">App Workspace ID:</span>
+                            <span class="font-bold text-sky-400 font-mono">{{ firebaseAppId }}</span>
+                        </div>
+                    </div>
+
+                    <p class="text-slate-300 text-[11px] leading-relaxed">
+                        Aplikasi tersambung ke <strong>Firebase Firestore Cloud</strong>. Setiap penambahan atau perubahan jadwal di perangkat mana pun (Laptop, HP Android, iPhone) akan langsung diperbarui di semua layar dalam hitungan detik!
+                    </p>
+
+                    <div class="flex justify-end pt-2 border-t border-slate-800">
+                        <button type="button" @click="activeCloudModal = false" class="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl font-bold cursor-pointer">Tutup</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div v-if="activeWaModal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
             <div class="bg-slate-900 border border-slate-800 w-full max-w-md rounded-2xl p-5 sm:p-6 shadow-2xl space-y-4">
                 <div class="flex items-center justify-between border-b border-slate-800 pb-3">
@@ -1161,7 +1360,6 @@ function handleReq(e){
             </div>
         </div>
 
-        <!-- MODAL 7: GEMINI AI EXTRACTION MODAL -->
         <div v-if="activeGeminiExtractModal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
             <div class="bg-slate-900 border border-slate-800 w-full max-w-lg rounded-2xl p-5 sm:p-6 shadow-2xl space-y-4 my-auto">
                 <div class="flex items-center justify-between border-b border-slate-800 pb-3">
@@ -1194,7 +1392,6 @@ function handleReq(e){
             </div>
         </div>
 
-        <!-- MODAL 8: GEMINI API KEY SETTINGS -->
         <div v-if="activeGeminiSettingsModal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
             <div class="bg-slate-900 border border-slate-800 w-full max-w-md rounded-2xl p-5 sm:p-6 shadow-2xl space-y-4">
                 <div class="flex items-center justify-between border-b border-slate-800 pb-3">
@@ -1219,37 +1416,6 @@ function handleReq(e){
             </div>
         </div>
 
-        <!-- MODAL 9: CLOUD DATABASE STATUS -->
-        <div v-if="activeCloudModal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
-            <div class="bg-slate-900 border border-slate-800 w-full max-w-md rounded-2xl p-5 sm:p-6 shadow-2xl space-y-4">
-                <div class="flex items-center justify-between border-b border-slate-800 pb-3">
-                    <div class="flex items-center gap-2">
-                        <i class="fa-solid fa-cloud-arrow-up text-emerald-400 text-xl"></i>
-                        <h3 class="font-extrabold text-sm sm:text-base text-white">Status Realtime Database Cloud</h3>
-                    </div>
-                    <button @click="activeCloudModal = false" class="text-slate-400 hover:text-white cursor-pointer"><i class="fa-solid fa-xmark"></i></button>
-                </div>
-
-                <div class="space-y-3 text-xs">
-                    <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-2">
-                        <div class="flex justify-between items-center">
-                            <span class="text-slate-400">Koneksi Firebase:</span>
-                            <span class="font-bold text-emerald-400 font-mono">TERHUBUNG (Realtime)</span>
-                        </div>
-                        <div class="flex justify-between items-center">
-                            <span class="text-slate-400">App ID Workspace:</span>
-                            <span class="font-bold text-sky-400 font-mono">{{ firebaseAppId }}</span>
-                        </div>
-                    </div>
-
-                    <div class="flex justify-end pt-2 border-t border-slate-800">
-                        <button type="button" @click="activeCloudModal = false" class="px-4 py-2 bg-slate-800 text-slate-300 rounded-xl font-bold cursor-pointer">Tutup</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- MODAL 10: CHANGE PASSWORD ADMIN -->
         <div v-if="activePasswordModal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
             <div class="bg-slate-900 border border-slate-800 w-full max-w-sm rounded-2xl p-5 sm:p-6 shadow-2xl space-y-4">
                 <div class="flex items-center justify-between border-b border-slate-800 pb-3">
@@ -1284,7 +1450,6 @@ function handleReq(e){
             </div>
         </div>
 
-        <!-- MODAL 11: IMPORT EXCEL -->
         <div v-if="activeImportBookingModal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
             <div class="bg-slate-900 border border-slate-800 w-full max-w-md rounded-2xl p-5 sm:p-6 shadow-2xl space-y-4">
                 <div class="flex items-center justify-between border-b border-slate-800 pb-3">
@@ -1306,7 +1471,6 @@ function handleReq(e){
             </div>
         </div>
 
-        <!-- MODAL 12: ADD / EDIT VEHICLE -->
         <div v-if="activeVehicleModal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
             <div class="bg-slate-900 border border-slate-800 w-full max-w-md rounded-2xl p-5 sm:p-6 shadow-2xl space-y-4">
                 <div class="flex items-center justify-between border-b border-slate-800 pb-3">
@@ -1341,7 +1505,6 @@ function handleReq(e){
             </div>
         </div>
 
-        <!-- MODAL 13: ADD / EDIT DRIVER -->
         <div v-if="activeDriverModal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
             <div class="bg-slate-900 border border-slate-800 w-full max-w-md rounded-2xl p-5 sm:p-6 shadow-2xl space-y-4">
                 <div class="flex items-center justify-between border-b border-slate-800 pb-3">
@@ -1371,7 +1534,6 @@ function handleReq(e){
             </div>
         </div>
 
-        <!-- MODAL 14: ADMIN LOGIN -->
         <div v-if="activeAdminModal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
             <div class="bg-slate-900 border border-slate-800 w-full max-w-sm rounded-2xl p-5 sm:p-6 shadow-2xl space-y-4">
                 <div class="text-center space-y-1">
@@ -1393,7 +1555,6 @@ function handleReq(e){
             </div>
         </div>
 
-        <!-- MODAL 15: TICKET DINAS PRINT/VIEW -->
         <div v-if="activeTicketModal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
             <div class="bg-white text-slate-900 border border-slate-300 w-full max-w-xl rounded-2xl p-6 shadow-2xl space-y-4 my-auto font-sans">
                 <div class="flex items-center justify-between border-b pb-3 no-print">
@@ -1445,7 +1606,6 @@ function handleReq(e){
             </div>
         </div>
 
-        <!-- MODAL 16: DELETE CONFIRMATION -->
         <div v-if="activeDeleteModal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
             <div class="bg-slate-900 border-t sm:border border-slate-800 w-full max-w-sm rounded-t-2xl sm:rounded-2xl p-5 sm:p-6 shadow-2xl space-y-4 text-center">
                 <div class="w-12 h-12 bg-rose-500/10 text-rose-400 rounded-full flex items-center justify-center mx-auto text-xl border border-rose-500/20"><i class="fa-solid fa-triangle-exclamation"></i></div>
@@ -1460,7 +1620,6 @@ function handleReq(e){
             </div>
         </div>
 
-        <!-- TOAST NOTIFICATION POPUP -->
         <div v-if="toast && toast.show" :class="toast.type === 'success' ? 'bg-emerald-600' : 'bg-rose-600'" class="fixed bottom-16 sm:bottom-6 right-4 sm:right-6 z-50 text-white px-3.5 py-2.5 rounded-2xl shadow-2xl flex items-center gap-2 text-xs font-bold animate-bounce max-w-[90vw] no-print">
             <i :class="toast.type === 'success' ? 'fa-solid fa-circle-check' : 'fa-solid fa-circle-exclamation'"></i>
             <span class="truncate">{{ toast.message }}</span>
@@ -1468,13 +1627,13 @@ function handleReq(e){
 
     </div>
 
-    <!-- VUE 3 & FIREBASE MODULE SCRIPT -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getDatabase, ref, set, remove, onValue } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-database.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, deleteDoc, onSnapshot, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { createApp } from "https://cdnjs.cloudflare.com/ajax/libs/vue/3.4.21/vue.esm-browser.prod.js";
 
+        // FIREBASE GLOBAL APP CONFIGURATION
         const rawAppId = typeof __app_id !== 'undefined' ? __app_id : 'uns-fleet-management';
         const appId = String(rawAppId).replace(/[\/\.\#\$\[\]]/g, '_');
 
@@ -1483,19 +1642,19 @@ function handleReq(e){
             : {
                 apiKey: "AIzaSyDKnUCUnDoPnhX9sW4QPJ6v4nQ2ZyMYo1k",
                 authDomain: "uns-fleet-management.firebaseapp.com",
-                databaseURL: "https://uns-fleet-management-default-rtdb.asia-southeast1.firebasedatabase.app",
                 projectId: "uns-fleet-management",
-                storageBucket: "uns-fleet-management.firebasestorage.app",
+                storageBucket: "uns-fleet-management.appspot.com",
                 messagingSenderId: "962442933742",
                 appId: "1:962442933742:web:b71d585ad4b13d8fb7caff"
             };
 
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
         let app, db, auth;
         try {
             app = initializeApp(firebaseConfig);
-            db = getDatabase(app);
+            db = getFirestore(app);
             auth = getAuth(app);
-            signInAnonymously(auth).catch(e => console.warn(e));
         } catch (e) {
             console.error("Firebase init error:", e);
         }
@@ -1520,6 +1679,7 @@ function handleReq(e){
                     inspectorDate: todayStr,
                     scheduleDateFilter: todayStr,
                     requestStatusFilter: 'ALL',
+                    unassignedSortOrder: 'NEAREST',
 
                     recapMonth: now.getMonth() + 1,
                     recapYear: now.getFullYear(),
@@ -1601,8 +1761,9 @@ function handleReq(e){
                     gcalWebhookUrl: localStorage.getItem('uns_gcal_webhook_url') || '',
                     gcalCalendarId: localStorage.getItem('uns_gcal_calendar_id') || 'primary',
                     isGCalSyncing: false,
+                    autoSyncTimerId: null,
 
-                    cloudStatus: 'connected',
+                    isCloudConnected: false,
                     firebaseAppId: appId,
                     toast: { show: false, message: '', type: 'success' },
 
@@ -1630,35 +1791,66 @@ function handleReq(e){
                     },
 
                     vehicles: JSON.parse(localStorage.getItem('uns_vehicles') || 'null') || [
-                        { id: 'AD 1001 ZA', plate: 'AD 1001 ZA', model: 'Toyota Innova Zenix 2.0 HV', driver: 'Pak Budi Hartono', color: 'sky', isAvailable: true },
-                        { id: 'AD 7002 GA', plate: 'AD 7002 GA', model: 'Toyota HiAce Commuter 2.5', driver: 'Pak Joko', color: 'emerald', isAvailable: true },
-                        { id: 'AD 1362 XA', plate: 'AD 1362 XA', model: 'Isuzu Panther Grand Royal', driver: 'Pak Sumpono', color: 'amber', isAvailable: true },
-                        { id: 'AD 1014 XH', plate: 'AD 1014 XH', model: 'Hyundai Staria 2.2 CRDi', driver: 'Pak Wachyu Sri Haryanto', color: 'purple', isAvailable: true }
+                        { id: 'AD_1150_XA', plate: 'AD 1150 XA', model: 'Toyota Innova Grand', driver: 'Pak Budi Hartono', color: 'sky', isAvailable: true },
+                        { id: 'AD_1047_XA', plate: 'AD 1047 XA', model: 'Toyota Innova E', driver: 'Pak Joko', color: 'amber', isAvailable: true },
+                        { id: 'AD_1367_XA', plate: 'AD 1367 XA', model: 'Toyota Innova Reborn', driver: 'Pak Sumpono', color: 'emerald', isAvailable: true },
+                        { id: 'AD_1014_XH', plate: 'AD 1014 XH', model: 'Toyota Innova Zenix 2.0 HV', driver: 'Pak Wachyu Sri Haryanto', color: 'purple', isAvailable: true },
+                        { id: 'AD_1062_XA', plate: 'AD 1062 XA', model: 'Toyota Camry 2.5 V', driver: 'Pak Budi Hartono', color: 'indigo', isAvailable: true },
+                        { id: 'AD_7741_A', plate: 'AD 7741 A', model: 'Bus Medium BRI', driver: 'Pak Joko', color: 'teal', isAvailable: true },
+                        { id: 'AD_7010_XA', plate: 'AD 7010 XA', model: 'Bus Big UNS', driver: 'Pak Sumpono', color: 'orange', isAvailable: true },
+                        { id: 'AD_7040_XA', plate: 'AD 7040 XA', model: 'Bus Medium UNS', driver: 'Pak Wachyu Sri Haryanto', color: 'rose', isAvailable: true },
+                        { id: 'AD_1506_XA', plate: 'AD 1506 XA', model: 'Toyota Avanza G', driver: 'Pak Budi Hartono', color: 'sky', isAvailable: true },
+                        { id: 'AD_1146_XA', plate: 'AD 1146 XA', model: 'Toyota Avanza Veloz', driver: 'Pak Joko', color: 'amber', isAvailable: true },
+                        { id: 'AD_7153_XA', plate: 'AD 7153 XA', model: 'Toyota HiAce Commuter', driver: 'Pak Sumpono', color: 'emerald', isAvailable: true },
+                        { id: 'AD_1236_XA', plate: 'AD 1236 XA', model: 'Hyundai Staria 2.2 CRDi', driver: 'Pak Wachyu Sri Haryanto', color: 'purple', isAvailable: true },
+                        { id: 'AD_1362_XA', plate: 'AD 1362 XA', model: 'Isuzu Panther Grand Royal', driver: 'Pak Budi Hartono', color: 'indigo', isAvailable: true },
+                        { id: 'AD_1001_ZA', plate: 'AD 1001 ZA', model: 'Toyota Innova Zenix HV', driver: 'Pak Joko', color: 'sky', isAvailable: true },
+                        { id: 'AD_7002_GA', plate: 'AD 7002 GA', model: 'Toyota HiAce Commuter 2.5', driver: 'Pak Sumpono', color: 'emerald', isAvailable: true }
                     ],
                     drivers: JSON.parse(localStorage.getItem('uns_schedule_drivers') || 'null') || [
                         { id: 'D-01', name: 'Pak Budi Hartono', phone: '08122949491', isAvailable: true },
                         { id: 'D-02', name: 'Pak Joko', phone: '08132949492', isAvailable: true },
                         { id: 'D-03', name: 'Pak Sumpono', phone: '08152949493', isAvailable: true },
-                        { id: 'D-04', name: 'Pak Wachyu Sri Haryanto', phone: '08162949494', isAvailable: true }
+                        { id: 'D-04', name: 'Pak Wachyu Sri Haryanto', phone: '08162949494', isAvailable: true },
+                        { id: 'D-05', name: 'Pak Tri Boko', phone: '08172949495', isAvailable: true },
+                        { id: 'D-06', name: 'Pak Yudo Prihandono', phone: '08182949496', isAvailable: true },
+                        { id: 'D-07', name: 'Pak Randy Indrawirawan', phone: '08192949497', isAvailable: true },
+                        { id: 'D-08', name: 'Pak Fuad Hasan', phone: '08202949498', isAvailable: true }
                     ],
                     bookings: JSON.parse(localStorage.getItem('uns_schedule_bookings') || 'null') || []
                 };
             },
 
-            created() {
-                this.setupRealtimeListeners();
-                
-                if (this.gcalWebhookUrl) {
-                    this.pullEventsFromGoogleCalendar(true);
-                    setInterval(() => {
-                        if (this.gcalWebhookUrl) {
-                            this.pullEventsFromGoogleCalendar(true);
-                        }
-                    }, 60000);
-                }
+            async created() {
+                await this.initFirebaseRealtimeSync();
+                this.startAutoSyncTimer();
             },
 
             computed: {
+                unassignedBookings() {
+                    let list = (this.bookings || []).filter(b => {
+                        if (!b || b.status === 'REJECTED') return false;
+                        const drv = this.getDriverObj(b.driverId);
+                        return !drv || !drv.id || drv.name === 'Belum Ditentukan';
+                    });
+
+                    list.sort((a, b) => {
+                        const timeA = new Date(a.startDate || 0).getTime();
+                        const timeB = new Date(b.startDate || 0).getTime();
+                        if (this.unassignedSortOrder === 'NEAREST') {
+                            return timeA - timeB;
+                        } else {
+                            return timeB - timeA;
+                        }
+                    });
+
+                    return list;
+                },
+
+                unassignedBookingsCount() {
+                    return this.unassignedBookings.length;
+                },
+
                 vehicleMap() {
                     const map = new Map();
                     (this.vehicles || []).forEach(v => {
@@ -1697,7 +1889,6 @@ function handleReq(e){
                     return months[this.calMonth] || '';
                 },
 
-                // HIGH-PERFORMANCE MULTI-DAY CALENDAR WEEKS COMPUTED PROPERTY
                 calendarWeeks() {
                     const year = this.calYear;
                     const month = this.calMonth;
@@ -1747,7 +1938,6 @@ function handleReq(e){
                         });
                     }
 
-                    // Pre-process active bookings date boundaries once for performance
                     const parsedBookings = (this.bookings || []).filter(b => b && b.startDate && b.status !== 'REJECTED').map(b => {
                         const bStart = this.getLocalDateString(b.startDate);
                         const bEnd = b.endDate ? this.getLocalDateString(b.endDate) : bStart;
@@ -1799,7 +1989,6 @@ function handleReq(e){
                             const isStartOfBooking = bStart >= weekDays[startIndex].dateStr;
                             const isEndOfBooking = bEnd <= weekDays[endIndex].dateStr;
 
-                            // Pre-compute label & badgeStyle ONCE to eliminate template CPU bottleneck
                             const label = this.getCalEventLabel(b);
                             const badgeStyle = this.getCalBadgeStyle(b);
 
@@ -1961,7 +2150,7 @@ function handleReq(e){
                         });
 
                         const totalActiveDays = activeDaysSet.size;
-                        let statusText = 'Sangat Seimbang';
+                        let statusText = 'Normal / Seimbang';
                         let badgeClass = 'bg-emerald-950 text-emerald-300 border border-emerald-800';
 
                         if (totalActiveDays === 0) {
@@ -1978,26 +2167,203 @@ function handleReq(e){
             },
 
             methods: {
+                async initFirebaseRealtimeSync() {
+                    if (!db) return;
+                    try {
+                        if (auth && initialAuthToken) {
+                            await signInWithCustomToken(auth, initialAuthToken).catch(() => signInAnonymously(auth));
+                        } else if (auth) {
+                            await signInAnonymously(auth).catch(e => console.warn("Anonymous auth failed:", e));
+                        }
+                    } catch (e) {
+                        console.warn("Auth setup warning:", e);
+                    }
+
+                    this.isCloudConnected = true;
+
+                    try {
+                        // Realtime listener for bookings
+                        const bookingsCol = collection(db, `artifacts/${appId}/public/data/bookings`);
+                        onSnapshot(bookingsCol, (snap) => {
+                            const list = [];
+                            snap.forEach(docSnap => {
+                                list.push(docSnap.data());
+                            });
+                            if (list.length > 0) {
+                                this.bookings = list;
+                                localStorage.setItem('uns_schedule_bookings', JSON.stringify(this.bookings));
+                            }
+                        }, (err) => console.warn("Bookings snapshot error:", err));
+
+                        // Realtime listener for drivers
+                        const driversCol = collection(db, `artifacts/${appId}/public/data/drivers`);
+                        onSnapshot(driversCol, (snap) => {
+                            const list = [];
+                            snap.forEach(docSnap => {
+                                list.push(docSnap.data());
+                            });
+                            if (list.length > 0) {
+                                this.drivers = list;
+                                localStorage.setItem('uns_schedule_drivers', JSON.stringify(this.drivers));
+                            }
+                        }, (err) => console.warn("Drivers snapshot error:", err));
+
+                        // Realtime listener for vehicles
+                        const vehiclesCol = collection(db, `artifacts/${appId}/public/data/vehicles`);
+                        onSnapshot(vehiclesCol, (snap) => {
+                            const list = [];
+                            snap.forEach(docSnap => {
+                                list.push(docSnap.data());
+                            });
+                            if (list.length > 0) {
+                                this.vehicles = list;
+                                localStorage.setItem('uns_vehicles', JSON.stringify(this.vehicles));
+                            }
+                        }, (err) => console.warn("Vehicles snapshot error:", err));
+
+                        // Realtime listener for settings
+                        const settingsDoc = doc(db, `artifacts/${appId}/public/data/settings`, 'config');
+                        onSnapshot(settingsDoc, (snap) => {
+                            if (snap.exists()) {
+                                const s = snap.data();
+                                if (s.geminiApiKey) { this.geminiApiKey = s.geminiApiKey; localStorage.setItem('uns_gemini_api_key', s.geminiApiKey); }
+                                if (s.waGatewayToken) { this.waGatewayToken = s.waGatewayToken; localStorage.setItem('uns_wa_gateway_token', s.waGatewayToken); }
+                                if (s.gcalWebhookUrl) {
+                                    const oldUrl = this.gcalWebhookUrl;
+                                    this.gcalWebhookUrl = s.gcalWebhookUrl;
+                                    localStorage.setItem('uns_gcal_webhook_url', s.gcalWebhookUrl);
+                                    if (!oldUrl && s.gcalWebhookUrl) {
+                                        this.pullEventsFromGoogleCalendar(true);
+                                    }
+                                }
+                                if (s.adminPassword) { this.adminPassword = s.adminPassword; localStorage.setItem('uns_admin_pwd', s.adminPassword); }
+                            }
+                        }, (err) => console.warn("Settings snapshot error:", err));
+
+                    } catch (e) {
+                        console.error("Firestore listener error:", e);
+                    }
+                },
+
+                startAutoSyncTimer() {
+                    if (this.autoSyncTimerId) clearInterval(this.autoSyncTimerId);
+                    if (this.gcalWebhookUrl) {
+                        this.pullEventsFromGoogleCalendar(true);
+                        this.autoSyncTimerId = setInterval(() => {
+                            if (this.gcalWebhookUrl) {
+                                this.pullEventsFromGoogleCalendar(true);
+                            }
+                        }, 60000);
+                    }
+                },
+
+                async saveToFirestore(colName, docId, data) {
+                    if (!db || !docId) return;
+                    try {
+                        const cleanDocId = String(docId).replace(/[\/\.\#\$\[\]]/g, '_');
+                        const docRef = doc(db, `artifacts/${appId}/public/data/${colName}`, cleanDocId);
+                        await setDoc(docRef, JSON.parse(JSON.stringify(data)), { merge: true });
+                    } catch (e) {
+                        console.warn(`Firestore save error (${colName}/${docId}):`, e);
+                    }
+                },
+
+                async deleteFromFirestore(colName, docId) {
+                    if (!db || !docId) return;
+                    try {
+                        const cleanDocId = String(docId).replace(/[\/\.\#\$\[\]]/g, '_');
+                        const docRef = doc(db, `artifacts/${appId}/public/data/${colName}`, cleanDocId);
+                        await deleteDoc(docRef);
+                    } catch (e) {
+                        console.warn(`Firestore delete error (${colName}/${docId}):`, e);
+                    }
+                },
+
+                fetchGCalWithFallback(url) {
+                    return new Promise((resolve, reject) => {
+                        fetch(url)
+                            .then(res => res.json())
+                            .then(data => resolve(data))
+                            .catch(() => {
+                                const callbackName = 'gcal_cb_' + Math.floor(Math.random() * 1000000);
+                                const script = document.createElement('script');
+                                const sep = url.includes('?') ? '&' : '?';
+                                script.src = `${url}${sep}callback=${callbackName}`;
+
+                                let finished = false;
+                                window[callbackName] = (data) => {
+                                    finished = true;
+                                    cleanup();
+                                    resolve(data);
+                                };
+
+                                script.onerror = () => {
+                                    if (!finished) {
+                                        cleanup();
+                                        reject(new Error('Failed to fetch Google Calendar (CORS / Network error)'));
+                                    }
+                                };
+
+                                function cleanup() {
+                                    delete window[callbackName];
+                                    if (script.parentNode) script.parentNode.removeChild(script);
+                                }
+
+                                document.body.appendChild(script);
+
+                                setTimeout(() => {
+                                    if (!finished) {
+                                        cleanup();
+                                        reject(new Error('Google Calendar sync request timeout'));
+                                    }
+                                }, 12000);
+                            });
+                    });
+                },
+
+                async assignDriverAndSync(b) {
+                    if (!b || !b.driverId) return;
+                    const dObj = this.getDriverObj(b.driverId);
+                    if (!dObj) return;
+
+                    const idx = (this.bookings || []).findIndex(x => x.id === b.id);
+                    if (idx !== -1) {
+                        this.bookings[idx].driverId = dObj.id;
+                        localStorage.setItem('uns_schedule_bookings', JSON.stringify(this.bookings));
+                        this.saveToFirestore('bookings', b.id, this.bookings[idx]);
+                        this.pushBookingToGoogleCalendar(this.bookings[idx]);
+                        this.showToast(`Driver ${dObj.name} berhasil ditugaskan & disinkronkan ke GCal!`, 'success');
+                    }
+                },
+
                 getDriverObj(dId) {
                     if (!dId) return null;
                     const clean = String(dId).trim().toLowerCase();
+                    if (!clean || clean === 'belum ditentukan') return null;
                     if (this.driverMap.has(clean)) return this.driverMap.get(clean);
                     return (this.drivers || []).find(d => {
-                        if (!d) return false;
-                        if (clean.includes('budi') && d.name.toLowerCase().includes('budi')) return true;
-                        if ((clean.includes('pono') || clean.includes('sumpono')) && d.name.toLowerCase().includes('sumpono')) return true;
-                        if ((clean.includes('wahyu') || clean.includes('wachyu') || clean.includes('wsh')) && d.name.toLowerCase().includes('wachyu')) return true;
-                        if (clean.includes('joko') && d.name.toLowerCase().includes('joko')) return true;
+                        if (!d || !d.name) return false;
+                        const n = d.name.toLowerCase();
+                        if ((clean === 'bh' || clean.includes('budi')) && n.includes('budi')) return true;
+                        if ((clean.includes('pono') || clean.includes('sumpono')) && n.includes('sumpono')) return true;
+                        if ((clean.includes('wahyu') || clean.includes('wachyu') || clean === 'wsh') && n.includes('wachyu')) return true;
+                        if ((clean.includes('boko') || clean.includes('tri')) && n.includes('boko')) return true;
+                        if (clean.includes('yudo') && n.includes('yudo')) return true;
+                        if ((clean.includes('randy') || clean.includes('randi') || clean.includes('rendi')) && n.includes('randy')) return true;
+                        if (clean.includes('fuad') && n.includes('fuad')) return true;
+                        if (clean.includes('joko') && !n.includes('boko') && n.includes('joko')) return true;
                         return false;
                     }) || null;
                 },
 
                 getVehicleObj(vId) {
                     if (!vId) return null;
-                    const clean = String(vId).replace(/\s+/g, '').toLowerCase();
+                    const clean = String(vId).replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
                     if (this.vehicleMap.has(clean)) return this.vehicleMap.get(clean);
                     return (this.vehicles || []).find(v => {
                         if (!v) return false;
+                        if (v.id && String(v.id).replace(/[^a-zA-Z0-9]/g, '').toLowerCase() === clean) return true;
+                        if (v.plate && String(v.plate).replace(/[^a-zA-Z0-9]/g, '').toLowerCase() === clean) return true;
                         if (v.model && String(v.model).replace(/\s+/g, '').toLowerCase().includes(clean)) return true;
                         return false;
                     }) || null;
@@ -2183,9 +2549,7 @@ function handleReq(e){
                 setVehicleColor(car, colorId) {
                     car.color = colorId;
                     localStorage.setItem('uns_vehicles', JSON.stringify(this.vehicles));
-                    if (db) {
-                        try { set(ref(db, `artifacts/${appId}/public/data/vehicles/${car.id}`), car); } catch(e){}
-                    }
+                    this.saveToFirestore('vehicles', car.id, car);
                     this.showToast(`Warna badge ${car.plate} diperbarui!`, 'success');
                 },
 
@@ -2209,16 +2573,14 @@ function handleReq(e){
                             targetCar = this.vehicles[idx];
                         }
                     } else {
-                        const plateId = this.vehicleForm.plate.toUpperCase().trim();
-                        targetCar = { ...this.vehicleForm, id: plateId, plate: plateId };
+                        const plateId = this.vehicleForm.plate.toUpperCase().trim().replace(/\s+/g, '_');
+                        targetCar = { ...this.vehicleForm, id: plateId, plate: this.vehicleForm.plate.toUpperCase().trim() };
                         this.vehicles.push(targetCar);
                     }
                     localStorage.setItem('uns_vehicles', JSON.stringify(this.vehicles));
-                    if (db && targetCar) {
-                        try { set(ref(db, `artifacts/${appId}/public/data/vehicles/${targetCar.id}`), targetCar); } catch(e){}
-                    }
+                    if (targetCar) this.saveToFirestore('vehicles', targetCar.id, targetCar);
                     this.activeVehicleModal = false;
-                    this.showToast('Data armada mobil disimpan!', 'success');
+                    this.showToast('Data armada mobil disimpan ke Cloud!', 'success');
                 },
 
                 openDeleteVehicleModal(car) {
@@ -2231,38 +2593,32 @@ function handleReq(e){
                 confirmDeleteBooking() {
                     if (this.vehicleToDelete && this.vehicleToDelete.id) {
                         const plate = this.vehicleToDelete.plate;
-                        this.vehicles = (this.vehicles || []).filter(v => v && v.id !== this.vehicleToDelete.id);
+                        const targetId = this.vehicleToDelete.id;
+                        this.vehicles = (this.vehicles || []).filter(v => v && v.id !== targetId);
                         localStorage.setItem('uns_vehicles', JSON.stringify(this.vehicles));
-                        if (db) {
-                            try { remove(ref(db, `artifacts/${appId}/public/data/vehicles/${this.vehicleToDelete.id}`)); } catch(e){}
-                        }
+                        this.deleteFromFirestore('vehicles', targetId);
                         this.showToast(`Armada ${plate} berhasil dihapus.`, 'success');
                         this.vehicleToDelete = null;
                     } else if (this.driverToDelete && this.driverToDelete.id) {
                         const name = this.driverToDelete.name;
-                        this.drivers = (this.drivers || []).filter(d => d && d.id !== this.driverToDelete.id);
+                        const targetId = this.driverToDelete.id;
+                        this.drivers = (this.drivers || []).filter(d => d && d.id !== targetId);
                         localStorage.setItem('uns_schedule_drivers', JSON.stringify(this.drivers));
-                        if (db) {
-                            try { remove(ref(db, `artifacts/${appId}/public/data/drivers/${this.driverToDelete.id}`)); } catch(e){}
-                        }
+                        this.deleteFromFirestore('drivers', targetId);
                         this.showToast(`Data driver ${name} berhasil dihapus.`, 'success');
                         this.driverToDelete = null;
                     } else if (this.bookingToDelete === 'ALL') {
+                        this.bookings.forEach(b => this.deleteFromFirestore('bookings', b.id));
                         this.bookings = [];
                         localStorage.removeItem('uns_schedule_bookings');
-                        if (db) {
-                            try { remove(ref(db, `artifacts/${appId}/public/data/bookings`)); } catch(e){}
-                        }
                         this.showToast('Semua data peminjaman telah dihapus.', 'success');
                     } else if (this.bookingToDelete && this.bookingToDelete.id) {
                         const targetId = this.bookingToDelete.id;
                         this.bookings = (this.bookings || []).filter(b => b && b.id !== targetId);
                         localStorage.setItem('uns_schedule_bookings', JSON.stringify(this.bookings));
-                        if (db) {
-                            try { remove(ref(db, `artifacts/${appId}/public/data/bookings/${targetId}`)); } catch(e){}
-                        }
+                        this.deleteFromFirestore('bookings', targetId);
                         this.deleteBookingFromGoogleCalendar(targetId);
-                        this.showToast('Data peminjaman dihapus.', 'success');
+                        this.showToast('Data peminjaman dihapus dari Cloud & Google Calendar.', 'success');
                     }
                     this.activeDeleteModal = false;
                     this.bookingToDelete = null;
@@ -2353,11 +2709,9 @@ function handleReq(e){
 
                 saveGeminiSettings() {
                     localStorage.setItem('uns_gemini_api_key', this.geminiApiKey);
-                    if (db) {
-                        try { set(ref(db, `artifacts/${appId}/public/data/settings/geminiApiKey`), this.geminiApiKey); } catch(e){}
-                    }
+                    this.saveToFirestore('settings', 'config', { geminiApiKey: this.geminiApiKey });
                     this.activeGeminiSettingsModal = false;
-                    this.showToast('Gemini API Key tersimpan di Cloud & Lokal!', 'success');
+                    this.showToast('Gemini API Key tersimpan di Cloud!', 'success');
                 },
 
                 handleGeminiImageUpload(e) {
@@ -2494,11 +2848,11 @@ Teks memo/pesan: ${this.geminiInputText}`;
 
                     localStorage.setItem('uns_schedule_bookings', JSON.stringify(this.bookings));
                     if (savedBooking) {
-                        this.syncBookingToCloud(savedBooking);
+                        this.saveToFirestore('bookings', savedBooking.id, savedBooking);
                         this.pushBookingToGoogleCalendar(savedBooking);
                     }
                     this.activeBookingModal = false;
-                    this.showToast('Permohonan peminjaman berhasil disimpan!', 'success');
+                    this.showToast('Permohonan disimpan ke Cloud Realtime!', 'success');
                 },
 
                 openApprovalModal(b) {
@@ -2514,7 +2868,7 @@ Teks memo/pesan: ${this.geminiInputText}`;
                     if (idx !== -1) {
                         this.bookings[idx] = { ...this.bookingForm };
                         localStorage.setItem('uns_schedule_bookings', JSON.stringify(this.bookings));
-                        this.syncBookingToCloud(this.bookings[idx]);
+                        this.saveToFirestore('bookings', this.bookings[idx].id, this.bookings[idx]);
                         this.pushBookingToGoogleCalendar(this.bookings[idx]);
                     }
                     this.activeApprovalModal = false;
@@ -2555,11 +2909,9 @@ Teks memo/pesan: ${this.geminiInputText}`;
                     }
                     this.adminPassword = this.pwdForm.newPwd;
                     localStorage.setItem('uns_admin_pwd', this.pwdForm.newPwd);
-                    if (db) {
-                        try { set(ref(db, `artifacts/${appId}/public/data/settings/adminPassword`), this.pwdForm.newPwd); } catch(e){}
-                    }
+                    this.saveToFirestore('settings', 'config', { adminPassword: this.pwdForm.newPwd });
                     this.activePasswordModal = false;
-                    this.showToast('Password Admin diperbarui di Cloud & Lokal!', 'success');
+                    this.showToast('Password Admin diperbarui di Cloud!', 'success');
                 },
 
                 openDeleteAllModal() {
@@ -2615,13 +2967,14 @@ Teks memo/pesan: ${this.geminiInputText}`;
                                         createdAt: new Date().toISOString()
                                     };
                                     this.bookings.unshift(newB);
-                                    this.syncBookingToCloud(newB);
+                                    this.saveToFirestore('bookings', newB.id, newB);
+                                    this.pushBookingToGoogleCalendar(newB);
                                     importedCount++;
                                 }
                             });
                             localStorage.setItem('uns_schedule_bookings', JSON.stringify(this.bookings));
                             this.activeImportBookingModal = false;
-                            this.showToast(`Berhasil mengimpor ${importedCount} jadwal!`, 'success');
+                            this.showToast(`Berhasil mengimpor ${importedCount} jadwal ke Cloud!`, 'success');
                         } catch (err) {
                             this.showToast('Gagal membaca file Excel', 'error');
                         }
@@ -2783,18 +3136,14 @@ Teks memo/pesan: ${this.geminiInputText}`;
                 toggleVehicleAvailability(v) {
                     v.isAvailable = (v.isAvailable === false);
                     localStorage.setItem('uns_vehicles', JSON.stringify(this.vehicles));
-                    if (db) {
-                        try { set(ref(db, `artifacts/${appId}/public/data/vehicles/${v.id}`), v); } catch(e){}
-                    }
+                    this.saveToFirestore('vehicles', v.id, v);
                     this.showToast(`Status ${v.plate} diperbarui`, 'success');
                 },
 
                 toggleDriverAvailability(d) {
                     d.isAvailable = (d.isAvailable === false);
                     localStorage.setItem('uns_schedule_drivers', JSON.stringify(this.drivers));
-                    if (db) {
-                        try { set(ref(db, `artifacts/${appId}/public/data/drivers/${d.id}`), d); } catch(e){}
-                    }
+                    this.saveToFirestore('drivers', d.id, d);
                     this.showToast(`Status ${d.name} diperbarui`, 'success');
                 },
 
@@ -2822,11 +3171,9 @@ Teks memo/pesan: ${this.geminiInputText}`;
                         this.drivers.push(targetDriver);
                     }
                     localStorage.setItem('uns_schedule_drivers', JSON.stringify(this.drivers));
-                    if (db && targetDriver) {
-                        try { set(ref(db, `artifacts/${appId}/public/data/drivers/${targetDriver.id}`), targetDriver); } catch(e){}
-                    }
+                    if (targetDriver) this.saveToFirestore('drivers', targetDriver.id, targetDriver);
                     this.activeDriverModal = false;
-                    this.showToast('Data driver berhasil disimpan!', 'success');
+                    this.showToast('Data driver berhasil disimpan ke Cloud!', 'success');
                 },
 
                 openWaDriverChat(b) {
@@ -2841,20 +3188,17 @@ Teks memo/pesan: ${this.geminiInputText}`;
 
                 saveWaSettings() {
                     localStorage.setItem('uns_wa_gateway_token', this.waGatewayToken);
-                    if (db) {
-                        try { set(ref(db, `artifacts/${appId}/public/data/settings/waGatewayToken`), this.waGatewayToken); } catch(e){}
-                    }
+                    this.saveToFirestore('settings', 'config', { waGatewayToken: this.waGatewayToken });
                     this.activeWaModal = false;
-                    this.showToast('Pengaturan WA Bot tersimpan di Cloud & Lokal!', 'success');
+                    this.showToast('Pengaturan WA Bot tersimpan!', 'success');
                 },
 
                 saveGCalSettings() {
                     localStorage.setItem('uns_gcal_webhook_url', this.gcalWebhookUrl);
-                    if (db) {
-                        try { set(ref(db, `artifacts/${appId}/public/data/settings/gcalWebhookUrl`), this.gcalWebhookUrl); } catch(e){}
-                    }
+                    this.saveToFirestore('settings', 'config', { gcalWebhookUrl: this.gcalWebhookUrl });
                     this.activeGCalModal = false;
-                    this.showToast('URL Google Calendar tersimpan di Cloud & Auto-Sync aktif!', 'success');
+                    this.startAutoSyncTimer();
+                    this.showToast('URL Google Calendar tersimpan di Cloud & Auto-Sync Aktif!', 'success');
                     if (this.gcalWebhookUrl) {
                         this.pullEventsFromGoogleCalendar(false);
                     }
@@ -2910,10 +3254,9 @@ Teks memo/pesan: ${this.geminiInputText}`;
                     this.isGCalSyncing = true;
                     try {
                         const fetchUrl = `${this.gcalWebhookUrl}?action=fetchEvents&pastDays=365&futureDays=365&calendarId=${encodeURIComponent(this.gcalCalendarId)}`;
-                        const res = await fetch(fetchUrl);
-                        const data = await res.json();
+                        const data = await this.fetchGCalWithFallback(fetchUrl);
 
-                        if (data && data.status === 'success' && data.events) {
+                        if (data && data.status === 'success' && Array.isArray(data.events)) {
                             let addedCount = 0;
                             let updatedCount = 0;
 
@@ -2925,57 +3268,76 @@ Teks memo/pesan: ${this.geminiInputText}`;
                                 const startFormatted = this.formatGCalDate(ev.startDate, ev.isAllDay, false);
                                 const endFormatted = this.formatGCalDate(ev.endDate, ev.isAllDay, true);
 
+                                // 1. DRIVER PARSING HEURISTICS
                                 let matchedDriverId = '';
                                 const titleParts = titleStr.split(/\s*-\s*/);
                                 const firstSegment = (titleParts[0] || '').toLowerCase().trim();
 
-                                if (firstSegment === 'bh' || firstSegment.includes('budi')) {
-                                    const d = (this.drivers || []).find(x => x && x.name.toLowerCase().includes('budi'));
-                                    if (d) matchedDriverId = d.id;
-                                } else if (firstSegment === 'pono' || firstSegment.includes('sumpono')) {
-                                    const d = (this.drivers || []).find(x => x && (x.name.toLowerCase().includes('sumpono') || x.name.toLowerCase().includes('pono')));
-                                    if (d) matchedDriverId = d.id;
-                                } else if (firstSegment === 'wahyu' || firstSegment === 'wachyu' || firstSegment === 'wsh' || firstSegment.includes('wachyu') || firstSegment.includes('wahyu')) {
-                                    const d = (this.drivers || []).find(x => x && (x.name.toLowerCase().includes('wachyu') || x.name.toLowerCase().includes('wahyu')));
-                                    if (d) matchedDriverId = d.id;
-                                } else if (firstSegment === 'yudo' || firstSegment.includes('yudo')) {
-                                    const d = (this.drivers || []).find(x => x && x.name.toLowerCase().includes('yudo'));
-                                    if (d) matchedDriverId = d.id;
-                                } else if (firstSegment === 'randy' || firstSegment === 'randi' || firstSegment.includes('randy')) {
-                                    const d = (this.drivers || []).find(x => x && (x.name.toLowerCase().includes('randy') || x.name.toLowerCase().includes('randi')));
-                                    if (d) matchedDriverId = d.id;
-                                } else if (firstSegment === 'boko' || firstSegment.includes('boko')) {
-                                    const d = (this.drivers || []).find(x => x && (x.name.toLowerCase().includes('boko') || x.name.toLowerCase().includes('tri boko')));
-                                    if (d) matchedDriverId = d.id;
-                                } else if (firstSegment === 'joko' || firstSegment.includes('joko')) {
-                                    const d = (this.drivers || []).find(x => x && x.name.toLowerCase().includes('joko'));
-                                    if (d) matchedDriverId = d.id;
+                                const foundDriver = (this.drivers || []).find(x => {
+                                    if (!x || !x.name) return false;
+                                    const n = x.name.toLowerCase();
+                                    if ((firstSegment === 'bh' || firstSegment.includes('budi')) && n.includes('budi')) return true;
+                                    if ((firstSegment.includes('pono') || firstSegment.includes('sumpono')) && n.includes('sumpono')) return true;
+                                    if ((firstSegment.includes('wahyu') || firstSegment.includes('wachyu') || firstSegment === 'wsh') && n.includes('wachyu')) return true;
+                                    if ((firstSegment.includes('boko') || firstSegment.includes('tri boko') || firstSegment === 'tri') && n.includes('boko')) return true;
+                                    if (firstSegment.includes('yudo') && n.includes('yudo')) return true;
+                                    if ((firstSegment.includes('randy') || firstSegment.includes('randi') || firstSegment.includes('rendi')) && n.includes('randy')) return true;
+                                    if (firstSegment.includes('fuad') && n.includes('fuad')) return true;
+                                    if (firstSegment.includes('joko') && !firstSegment.includes('boko') && n.includes('joko')) return true;
+                                    return false;
+                                });
+
+                                if (foundDriver) {
+                                    matchedDriverId = foundDriver.id;
+                                } else {
+                                    matchedDriverId = ''; // Belum Ditentukan
                                 }
 
+                                // 2. VEHICLE PARSING HEURISTICS
                                 let matchedVehicleId = '';
-                                const plateMatch = combinedText.match(/ad\s*\d{3,4}\s*[a-z]{1,3}/i);
+                                
+                                const plateMatch = combinedText.match(/ad\s*[-_]?\s*\d{3,4}\s*[-_]?\s*[a-z]{1,3}/i);
                                 if (plateMatch) {
-                                    const cleanPlate = plateMatch[0].replace(/\s+/g, ' ').toUpperCase();
-                                    const v = (this.vehicles || []).find(x => x && x.plate && x.plate.replace(/\s+/g, '') === cleanPlate.replace(/\s+/g, ''));
+                                    const cleanPlate = plateMatch[0].replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+                                    const v = (this.vehicles || []).find(x => x && x.plate && x.plate.replace(/[^a-zA-Z0-9]/g, '').toUpperCase() === cleanPlate);
                                     if (v) matchedVehicleId = v.id;
                                 }
 
                                 if (!matchedVehicleId) {
-                                    if (combinedText.includes('inova') || combinedText.includes('innova')) {
-                                        const v = (this.vehicles || []).find(x => x && x.model && x.model.toLowerCase().includes('innova'));
-                                        if (v) matchedVehicleId = v.id;
-                                    } else if (combinedText.includes('hiace')) {
-                                        const v = (this.vehicles || []).find(x => x && x.model && x.model.toLowerCase().includes('hiace'));
-                                        if (v) matchedVehicleId = v.id;
-                                    } else if (combinedText.includes('panther')) {
-                                        const v = (this.vehicles || []).find(x => x && x.model && x.model.toLowerCase().includes('panther'));
-                                        if (v) matchedVehicleId = v.id;
-                                    } else if (combinedText.includes('staria')) {
-                                        const v = (this.vehicles || []).find(x => x && x.model && x.model.toLowerCase().includes('staria'));
-                                        if (v) matchedVehicleId = v.id;
+                                    if (combinedText.includes('reborn')) {
+                                        matchedVehicleId = 'AD_1367_XA';
+                                    } else if (combinedText.includes('zenix')) {
+                                        matchedVehicleId = 'AD_1014_XH';
+                                    } else if (combinedText.includes('camry')) {
+                                        matchedVehicleId = 'AD_1062_XA';
+                                    } else if (combinedText.includes('bus bri')) {
+                                        matchedVehicleId = 'AD_7741_A';
                                     } else if (combinedText.includes('bus')) {
-                                        const v = (this.vehicles || []).find(x => x && x.model && x.model.toLowerCase().includes('bus'));
-                                        if (v) matchedVehicleId = v.id;
+                                        if (!this.isVehicleBusy('AD_7010_XA', startFormatted, endFormatted)) {
+                                            matchedVehicleId = 'AD_7010_XA';
+                                        } else if (!this.isVehicleBusy('AD_7741_A', startFormatted, endFormatted)) {
+                                            matchedVehicleId = 'AD_7741_A';
+                                        } else {
+                                            matchedVehicleId = 'AD_7040_XA';
+                                        }
+                                    } else if (combinedText.includes('inova') || combinedText.includes('innova')) {
+                                        if (!this.isVehicleBusy('AD_1150_XA', startFormatted, endFormatted)) {
+                                            matchedVehicleId = 'AD_1150_XA';
+                                        } else {
+                                            matchedVehicleId = 'AD_1047_XA';
+                                        }
+                                    } else if (combinedText.includes('avanza')) {
+                                        if (!this.isVehicleBusy('AD_1506_XA', startFormatted, endFormatted)) {
+                                            matchedVehicleId = 'AD_1506_XA';
+                                        } else {
+                                            matchedVehicleId = 'AD_1146_XA';
+                                        }
+                                    } else if (combinedText.includes('hiace')) {
+                                        matchedVehicleId = 'AD_7153_XA';
+                                    } else if (combinedText.includes('staria')) {
+                                        matchedVehicleId = 'AD_1236_XA';
+                                    } else if (combinedText.includes('panther')) {
+                                        matchedVehicleId = 'AD_1362_XA';
                                     }
                                 }
 
@@ -2983,6 +3345,7 @@ Teks memo/pesan: ${this.geminiInputText}`;
                                     matchedVehicleId = this.activeVehicles[0].id;
                                 }
 
+                                // 3. APPLICANT & UNIT PARSING
                                 let applicantUnit = '';
                                 if (matchedDriverId && titleParts.length >= 3) {
                                     applicantUnit = titleParts.slice(2).join(' - ');
@@ -2995,10 +3358,9 @@ Teks memo/pesan: ${this.geminiInputText}`;
                                 }
 
                                 const locInfo = this.estimateGCalLocationAndDistance(ev.location, titleStr, descStr);
-
-                                const eventId = ev.automanId || (ev.id ? 'UNS-GCAL-' + String(ev.id).replace(/[^a-zA-Z0-9]/g, '') : 'UNS-GCAL-' + Math.floor(100000 + Math.random() * 900000));
+                                const eventId = ev.automanId || (ev.id ? 'GCAL-' + String(ev.id) : 'UNS-GCAL-' + Math.floor(100000 + Math.random() * 900000));
                                 
-                                const existingIdx = (this.bookings || []).findIndex(b => b && (b.id === eventId || b.id === ev.id));
+                                const existingIdx = (this.bookings || []).findIndex(b => b && (b.id === eventId || b.id === ev.id || (ev.automanId && b.id === ev.automanId)));
                                 
                                 const bookingObj = {
                                     id: eventId,
@@ -3011,18 +3373,22 @@ Teks memo/pesan: ${this.geminiInputText}`;
                                     startDate: startFormatted,
                                     endDate: endFormatted,
                                     vehicleId: matchedVehicleId,
-                                    driverId: matchedDriverId,
+                                    driverId: matchedDriverId, // May be '' if unassigned
                                     status: 'APPROVED',
                                     createdAt: ev.createdAt || new Date().toISOString()
                                 };
 
                                 if (existingIdx === -1) {
                                     this.bookings.unshift(bookingObj);
-                                    this.syncBookingToCloud(bookingObj);
+                                    this.saveToFirestore('bookings', bookingObj.id, bookingObj);
                                     addedCount++;
                                 } else {
+                                    // Retain assigned driver if existing booking has one assigned manually
+                                    if (this.bookings[existingIdx].driverId && !bookingObj.driverId) {
+                                        bookingObj.driverId = this.bookings[existingIdx].driverId;
+                                    }
                                     this.bookings[existingIdx] = bookingObj;
-                                    this.syncBookingToCloud(bookingObj);
+                                    this.saveToFirestore('bookings', bookingObj.id, bookingObj);
                                     updatedCount++;
                                 }
                             });
@@ -3036,7 +3402,7 @@ Teks memo/pesan: ${this.geminiInputText}`;
                             }
                         }
                     } catch (e) {
-                        if (!isSilent) this.showToast(`Gagal menarik Google Cal: ${e.message}`, 'error');
+                        if (!isSilent) this.showToast(e.message || 'Gagal menarik Google Cal', 'error');
                     } finally {
                         this.isGCalSyncing = false;
                     }
@@ -3086,62 +3452,6 @@ Teks memo/pesan: ${this.geminiInputText}`;
                 getMonthName(m) {
                     const months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
                     return months[m - 1] || '';
-                },
-
-                async syncBookingToCloud(b) {
-                    if (!db || !b || !b.id) return;
-                    try { await set(ref(db, `artifacts/${appId}/public/data/bookings/${b.id}`), b); } catch(e){}
-                },
-
-                setupRealtimeListeners() {
-                    if (!db) return;
-
-                    onValue(ref(db, `artifacts/${appId}/public/data/settings`), snap => {
-                        const s = snap.val();
-                        if (s) {
-                            if (s.geminiApiKey) { this.geminiApiKey = s.geminiApiKey; localStorage.setItem('uns_gemini_api_key', s.geminiApiKey); }
-                            if (s.waGatewayToken) { this.waGatewayToken = s.waGatewayToken; localStorage.setItem('uns_wa_gateway_token', s.waGatewayToken); }
-                            if (s.gcalWebhookUrl) {
-                                const oldUrl = this.gcalWebhookUrl;
-                                this.gcalWebhookUrl = s.gcalWebhookUrl;
-                                localStorage.setItem('uns_gcal_webhook_url', s.gcalWebhookUrl);
-                                if (!oldUrl && s.gcalWebhookUrl) {
-                                    this.pullEventsFromGoogleCalendar(true);
-                                }
-                            }
-                            if (s.adminPassword) { this.adminPassword = s.adminPassword; localStorage.setItem('uns_admin_pwd', s.adminPassword); }
-                        }
-                    });
-
-                    onValue(ref(db, `artifacts/${appId}/public/data/bookings`), snap => {
-                        const data = snap.val();
-                        if (data) {
-                            this.bookings = Array.isArray(data) ? data : Object.values(data);
-                            localStorage.setItem('uns_schedule_bookings', JSON.stringify(this.bookings));
-                        } else {
-                            this.bookings = [];
-                        }
-                    });
-
-                    onValue(ref(db, `artifacts/${appId}/public/data/drivers`), snap => {
-                        const data = snap.val();
-                        if (data) {
-                            this.drivers = Array.isArray(data) ? data : Object.values(data);
-                            localStorage.setItem('uns_schedule_drivers', JSON.stringify(this.drivers));
-                        }
-                    });
-
-                    onValue(ref(db, `artifacts/${appId}/public/data/vehicles`), snap => {
-                        const data = snap.val();
-                        if (data) {
-                            this.vehicles = Array.isArray(data) ? data : Object.values(data);
-                            localStorage.setItem('uns_vehicles', JSON.stringify(this.vehicles));
-                        }
-                    });
-                },
-
-                forceSyncFromFleetDatabase() {
-                    this.showToast('Data disinkronkan dengan Database Cloud!', 'success');
                 }
             }
         });
