@@ -68,8 +68,8 @@
     <div id="firebase-status-bar" class="fixed bottom-3 left-3 z-40 bg-white/95 backdrop-blur border border-slate-300 rounded-xl px-3.5 py-2 shadow-lg flex items-center gap-2.5 text-xs no-print max-w-md">
         <span id="firebase-dot" class="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse shrink-0"></span>
         <span id="firebase-status" class="text-slate-700 font-medium truncate">Menghubungkan ke Firebase…</span>
-        <button type="button" onclick="forceSyncFirebase()" class="ml-1 px-2 py-1 rounded-md bg-uns-blue hover:bg-uns-light text-white text-[11px] font-semibold transition shrink-0 flex items-center gap-1" title="Paksa Sinkronkan Ulang ke Cloud">
-            <i class="fa-solid fa-cloud-arrow-up"></i> Sync
+        <button type="button" onclick="refreshFirebaseData()" class="ml-1 px-2 py-1 rounded-md bg-uns-blue hover:bg-uns-light text-white text-[11px] font-semibold transition shrink-0 flex items-center gap-1" title="Ambil data terbaru dari Firebase">
+            <i class="fa-solid fa-rotate"></i> Refresh
         </button>
         <button type="button" onclick="openFirebaseDiagModal()" class="px-2 py-1 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-semibold transition shrink-0" title="Lihat Detail Koneksi & Perbaiki Error Firebase">
             <i class="fa-solid fa-wrench"></i>
@@ -916,22 +916,24 @@
             toast('Rules Firebase berhasil disalin! Tempelkan di tab Rules Firebase Console lalu klik Publish.');
         }
 
-        async function forceSyncFirebase() {
+        async function refreshFirebaseData() {
             if (!window.SIMKENDIS_FIREBASE) {
                 toast('Modul Firebase sedang dimuat, coba sesaat lagi.', true);
                 return;
             }
-            const cleanBookings = sanitizeForFirebase(bookings) || [];
-            toast('Menyinkronkan data ke Firebase...');
-            const result = await window.SIMKENDIS_FIREBASE.saveBookings(cleanBookings);
-            if (result && result.ok) {
-                toast(`Berhasil disimpan ke Firebase (${result.target || 'Cloud'}).`);
+            toast('Mengambil data terbaru dari Firebase...');
+            const result = await window.SIMKENDIS_FIREBASE.refresh();
+            if (result?.ok) {
+                toast('Data Firebase berhasil diperbarui.');
                 if (!$('firebase-diag-modal').classList.contains('hidden')) openFirebaseDiagModal();
             } else {
                 openFirebaseDiagModal();
-                toast('Sinkronisasi Firebase gagal. Data tetap tersimpan di browser — buka Diagnostik dan periksa Detail Error Teknis.', true);
+                toast('Gagal membaca Firebase. Data lokal tidak dihapus; periksa Diagnostik.', true);
             }
         }
+
+        // Kompatibilitas tombol/skrip lama: fungsi ini hanya membaca Firebase, tidak menulis ulang seluruh data.
+        async function forceSyncFirebase() { return refreshFirebaseData(); }
 
         function persistBookings() {
             try {
@@ -964,11 +966,6 @@
 
         window.addEventListener('simkendis-firebase-bookings-loaded', e => {
             if (!Array.isArray(e.detail)) return;
-            // Jika cloud kosong tetapi browser lokal punya data yang belum tersinkron, dorong data lokal ke cloud
-            if (e.detail.length === 0 && bookings.length > 0) {
-                forceSyncFirebase();
-                return;
-            }
             bookings = sanitizeForFirebase(e.detail) || [];
             normalizeMemoPaidStatuses();
             try { localStorage.setItem(STORAGE_KEY, JSON.stringify(bookings)); } catch(_){}
@@ -995,10 +992,12 @@
 
         function persistMaster() {
             try {
-                const payload = sanitizeForFirebase({vehicles:masterVehicles,drivers:masterDrivers,fuelPrices,memoSources});
+                const payload = sanitizeForFirebase({vehicles:masterVehicles,drivers:masterDrivers,fuelPrices,memoSources, updatedAt:new Date().toISOString()});
                 localStorage.setItem(MASTER_STORAGE_KEY, JSON.stringify(payload));
-                if (window.SIMKENDIS_FIREBASE?.setSettings) {
-                    window.SIMKENDIS_FIREBASE.setSettings(payload).catch(err => console.warn('Sinkronisasi pengaturan master gagal:', err));
+                if (window.SIMKENDIS_FIREBASE?.saveMasterSettings) {
+                    window.SIMKENDIS_FIREBASE.saveMasterSettings(payload).then(result => {
+                        if (!result?.ok) console.warn('Sinkronisasi pengaturan master gagal:', result);
+                    }).catch(err => console.warn('Sinkronisasi pengaturan master gagal:', err));
                 }
                 return true;
             }
@@ -1192,6 +1191,9 @@
         }
 
         function applyMasterLocalSettings() {
+            // Migrasi kompatibilitas: override lokal hanya dipakai sampai master Firebase pertama kali dimuat.
+            // Setelah pengaturan bersama diterima, Firebase menjadi sumber utama lintas perangkat.
+            if (window.__simkendisCloudMasterLoaded) return;
             try {
                 const x=JSON.parse(localStorage.getItem('simkendis_uns_master_overrides_v1')||'{}');
                 for(const v of masterVehicles) { const o=(x.vehicles||[]).find(y=>y.id===v.id); if(o){if(Number(o.ratio)>0)v.ratio=Number(o.ratio);if(['pertamax','dexlite'].includes(o.fuel))v.fuel=o.fuel;if(typeof o.isActive==='boolean')v.isActive=o.isActive;} }
@@ -2085,33 +2087,58 @@
             };
         }
 
+        let lastCloudBookingsJson = '';
+        let lastCloudSettingsJson = '';
+
+        function applyCloudSettings(raw) {
+            if (!raw || typeof raw !== 'object') return;
+            const master = raw.master && typeof raw.master === 'object' ? raw.master : raw;
+            if (Array.isArray(master.vehicles)) masterVehicles = master.vehicles;
+            if (Array.isArray(master.drivers)) masterDrivers = master.drivers;
+            if (Array.isArray(master.memoSources) && master.memoSources.length) memoSources = master.memoSources;
+            if (master.fuelPrices && typeof master.fuelPrices === 'object') fuelPrices = {...fuelPrices, ...master.fuelPrices};
+            if (raw.ai && typeof raw.ai === 'object') {
+                simkendisAiSettings = {...SIMKENDIS_AI_DEFAULTS, ...raw.ai};
+                const setValue = (id, value) => { const el = document.getElementById(id); if (el) el.value = value; };
+                const setChecked = (id, value) => { const el = document.getElementById(id); if (el) el.checked = value !== false; };
+                setValue('gemini-model', simkendisAiSettings.model || SIMKENDIS_AI_DEFAULTS.model);
+                setChecked('gemini-fallback', simkendisAiSettings.fallbackEnabled);
+                setChecked('gemini-retry', simkendisAiSettings.retryTransient);
+                setChecked('gemini-scan-receipt', simkendisAiSettings.scanReceiptEnabled);
+                setChecked('gemini-scan-memo', simkendisAiSettings.scanMemoEnabled);
+            }
+            window.__simkendisCloudMasterLoaded = true;
+            try { localStorage.setItem(MASTER_STORAGE_KEY, JSON.stringify({vehicles:masterVehicles,drivers:masterDrivers,fuelPrices,memoSources})); } catch (_) {}
+            renderMaster(); calculateBBM(); renderTable(); renderRealisasi();
+        }
+
+        async function refreshCloudData() {
+            const result = await loadBookingsFromCloud();
+            if (!result.ok) {
+                window.dispatchEvent(new CustomEvent('simkendis-firebase-status', {detail:{ok:false,message:'Gagal mengambil data Firebase',detail:result.error}}));
+                return {ok:false,error:result.error};
+            }
+            const normalized = Array.isArray(result.data) ? result.data : [];
+            lastCloudBookingsJson = JSON.stringify(normalized);
+            window.dispatchEvent(new CustomEvent('simkendis-firebase-bookings-loaded', {detail:normalized}));
+            const settings = await this.getSettings();
+            if (settings && typeof settings === 'object') {
+                lastCloudSettingsJson = JSON.stringify(settings);
+                applyCloudSettings(settings);
+            }
+            window.dispatchEvent(new CustomEvent('simkendis-firebase-status', {detail:{ok:true,message:`Data diperbarui dari Firebase (${result.source})`,detail:'Pembacaan dilakukan hanya saat aplikasi dibuka atau tombol Refresh ditekan.'}}));
+            return {ok:true,source:result.source};
+        }
+
         window.SIMKENDIS_FIREBASE = {
             async init() {
-                const result = await loadBookingsFromCloud();
                 ready = true;
-                if (result.ok) {
-                    if (Array.isArray(result.data)) {
-                        window.dispatchEvent(new CustomEvent('simkendis-firebase-bookings-loaded', { detail: result.data }));
-                    }
-                    window.dispatchEvent(new CustomEvent('simkendis-firebase-status', {
-                        detail: {
-                            ok: true,
-                            message: `Terhubung ke Firebase (${result.source})`,
-                            detail: 'Koneksi baca/tulis Cloud siap digunakan.'
-                        }
-                    }));
-                    return true;
-                } else {
-                    window.dispatchEvent(new CustomEvent('simkendis-firebase-status', {
-                        detail: {
-                            ok: false,
-                            message: 'Mode Lokal Aktif — koneksi Firebase perlu diperiksa',
-                            detail: result.error
-                        }
-                    }));
-                    return false;
-                }
+                const result = await refreshCloudData.call(this);
+                if (result.ok) return true;
+                window.dispatchEvent(new CustomEvent('simkendis-firebase-status', {detail:{ok:false,message:'Mode Lokal Aktif — koneksi Firebase perlu diperiksa',detail:result.error}}));
+                return false;
             },
+            async refresh() { return await refreshCloudData.call(this); },
             saveBookings(data) {
                 const nextOp = writeChain.catch(() => {}).then(async () => {
                     const res = await writeBookingsToCloud(data);
@@ -2147,9 +2174,16 @@
             async setSettings(data) {
                 const clean = window.sanitizeForFirebase ? window.sanitizeForFirebase(data) : data;
                 const r1 = await restWriteSafe(SIMKENDIS_CONFIG.databaseURL, SETTINGS_PATH, clean, getMainToken);
-                if (r1.ok) return r1.data;
+                if (r1.ok) { lastCloudSettingsJson = JSON.stringify(clean); return r1.data; }
                 const r2 = await restWriteSafe(ADMINAUTO_CONFIG.databaseURL, FALLBACK_SETTINGS_PATH, clean, getAdminToken);
-                return r2.ok ? r2.data : null;
+                if (r2.ok) { lastCloudSettingsJson = JSON.stringify(clean); return r2.data; }
+                return null;
+            },
+            async saveMasterSettings(masterData) {
+                const existing = await this.getSettings() || {};
+                const merged = {...existing, master: masterData, updatedAt:new Date().toISOString()};
+                const saved = await this.setSettings(merged);
+                return saved === null ? {ok:false,error:'Firebase menolak penyimpanan pengaturan master'} : {ok:true,data:saved};
             },
             async getIdToken() { return await getMainToken(false); },
             get ready() { return ready; }
