@@ -167,19 +167,22 @@
             </div>
         </section>
 
-        <!-- Main Content Grid: Form & Table -->
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        <!-- Main Content: daftar jadwal memenuhi lebar halaman; form dibuka sebagai dialog -->
+        <div class="grid grid-cols-1 gap-6 items-start">
 
-            <!-- Left Column: Input Form -->
-            <div class="lg:col-span-4 bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden no-print">
+            <!-- Dialog Form Peminjaman Baru / Edit -->
+            <div id="booking-form-modal" class="hidden fixed inset-0 z-[80] bg-slate-950/60 backdrop-blur-sm p-2 sm:p-5 flex items-center justify-center no-print" onclick="if(event.target===this) closeBookingFormModal()">
+              <div class="w-full max-w-3xl max-h-[96dvh] overflow-y-auto bg-white rounded-2xl shadow-2xl border border-slate-200">
+            <!-- Form panel -->
                 <div class="bg-slate-900 text-white px-5 py-4 flex items-center justify-between">
                     <div class="flex items-center gap-2.5">
                         <i class="fa-solid fa-plus-circle text-amber-400"></i>
                         <h3 id="form-title" class="font-semibold text-sm uppercase tracking-wider">Form Peminjaman Baru</h3>
                     </div>
-                    <button id="btn-cancel-edit" onclick="resetForm()" class="hidden text-xs bg-rose-500/20 text-rose-300 hover:bg-rose-500/30 px-2.5 py-1 rounded-md transition">
-                        Batal Edit
-                    </button>
+                    <div class="flex items-center gap-2">
+                      <button id="btn-cancel-edit" onclick="resetForm()" class="hidden text-xs bg-rose-500/20 text-rose-300 hover:bg-rose-500/30 px-2.5 py-1 rounded-md transition">Batal Edit</button>
+                      <button type="button" onclick="closeBookingFormModal()" aria-label="Tutup formulir" class="w-8 h-8 rounded-lg text-slate-300 hover:text-white hover:bg-white/10 flex items-center justify-center"><i class="fa-solid fa-xmark text-lg"></i></button>
+                    </div>
                 </div>
 
                 <div id="gemini-settings-panel" class="hidden mx-4 mt-4 p-3 rounded-xl border border-violet-200 bg-violet-50 space-y-3">
@@ -414,10 +417,15 @@
                         <span>Simpan Data Peminjaman</span>
                     </button>
                 </form>
+              </div>
             </div>
 
-            <!-- Right Column: Filter & Data Table -->
-            <div class="lg:col-span-8 space-y-4">
+            <!-- Daftar jadwal -->
+            <div class="w-full min-w-0 space-y-4">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 no-print">
+                  <div><h2 class="text-lg sm:text-xl font-extrabold text-slate-900">Jadwal Peminjaman Kendaraan</h2><p class="text-xs text-slate-500 mt-1">Cari, verifikasi, dan pantau memo serta struk BBM.</p></div>
+                  <button type="button" onclick="openBookingFormModal()" class="w-full sm:w-auto px-4 py-3 rounded-xl bg-uns-blue hover:bg-uns-light text-white font-bold text-sm shadow-sm flex items-center justify-center gap-2"><i class="fa-solid fa-plus-circle"></i> Peminjaman Baru</button>
+                </div>
 
                 <!-- Tab Navigation (Jadwal Aktif vs Terkirim ke BPU) -->
                 <div class="bg-white p-1.5 rounded-2xl shadow-sm border border-slate-200/80 flex flex-wrap gap-2 no-print">
@@ -443,7 +451,15 @@
                         <input type="text" id="search-input" oninput="renderTable()" placeholder="Cari peminjam, tujuan, no memo..." class="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-200 text-xs sm:text-sm focus:ring-2 focus:ring-uns-blue outline-none">
                     </div>
 
-                    <div class="flex items-center gap-2 w-full sm:w-auto">
+                    <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                        <select id="sort-bookings" onchange="renderTable()" aria-label="Urutkan jadwal" class="px-3 py-2 rounded-xl border border-slate-200 text-xs font-medium bg-white text-slate-700 outline-none flex-grow sm:flex-grow-0">
+                            <option value="date-desc">Tanggal: terbaru</option>
+                            <option value="date-asc">Tanggal: terlama</option>
+                            <option value="borrower-asc">Peminjam: A–Z</option>
+                            <option value="borrower-desc">Peminjam: Z–A</option>
+                            <option value="destination-asc">Tujuan: A–Z</option>
+                            <option value="memo-status">Status memo</option>
+                        </select>
                         <select id="filter-memo" onchange="renderTable()" class="px-3 py-2 rounded-xl border border-slate-200 text-xs font-medium bg-slate-50 text-slate-700 outline-none flex-grow sm:flex-grow-0">
                             <option value="ALL">Semua Status Memo</option>
                             <option value="Sudah Cair">Memo: Sudah Cair</option>
@@ -473,6 +489,7 @@
                         <table class="w-full text-left border-collapse">
                             <thead>
                                 <tr class="bg-slate-900 text-white text-[11px] uppercase tracking-wider">
+                                    <th class="py-3.5 px-4 font-semibold text-center">No.</th>
                                     <th class="py-3.5 px-4 font-semibold">Tanggal</th>
                                     <th class="py-3.5 px-4 font-semibold">Peminjam</th>
                                     <th class="py-3.5 px-4 font-semibold">Kendaraan & Driver</th>
@@ -953,6 +970,7 @@
                 return;
             }
             bookings = sanitizeForFirebase(e.detail) || [];
+            normalizeMemoPaidStatuses();
             try { localStorage.setItem(STORAGE_KEY, JSON.stringify(bookings)); } catch(_){}
             renderMaster(); renderTable(); renderRealisasi();
         });
@@ -1478,7 +1496,7 @@
                 strukList,
                 realisasiStruk:strukList.reduce((sum,s)=>sum+s.nominal,0),
                 noStruk:strukList.map(s=>s.noNota).filter(Boolean).join(', '),
-                statusMemo:((tempUploads.memoDataUrl || old?.memoDataUrl || old?.memoUrl || old?.memoURL || old?.memoDriveUrl || old?.memoFile?.url || old?.memoFile?.driveUrl) && (Number($('nominal-memo').value)||0)>0) ? 'Sudah Cair' : $('status-memo').value,
+                statusMemo:((tempUploads.memoDataUrl || old?.memoDataUrl || old?.memoUrl || old?.memoURL || old?.memoDriveUrl || old?.memoFile?.url || old?.memoFile?.driveUrl || old?.memoWebViewLink || old?.memoDownloadUrl || old?.documents?.memo?.url) && (Number($('nominal-memo').value)||0)>0) ? 'Sudah Cair' : $('status-memo').value,
                 memoDari:$('memo-dari').value||'Perencanaan',
                 memoUnitKerja:window.__simkendisScannedMemoUnit||old?.memoUnitKerja||'',
                 nominalMemo:Math.max(0,Number($('nominal-memo').value)||0),
@@ -1493,7 +1511,19 @@
             toast(id?'Perubahan peminjaman disimpan.':'Peminjaman berhasil disimpan.');
         }
 
+        function openBookingFormModal() {
+            $('booking-form-modal').classList.remove('hidden');
+            $('booking-form-modal').classList.add('flex');
+            document.body.classList.add('overflow-hidden');
+        }
+        function closeBookingFormModal() {
+            $('booking-form-modal').classList.add('hidden');
+            $('booking-form-modal').classList.remove('flex');
+            document.body.classList.remove('overflow-hidden');
+        }
+
         function resetForm() {
+            closeBookingFormModal();
             $('booking-form').reset(); $('edit-id').value=''; $('form-title').textContent='Form Peminjaman Baru';
             $('btn-submit').querySelector('span').textContent='Simpan Data Peminjaman'; $('btn-cancel-edit').classList.add('hidden');
             $('tujuan-detail').value=''; $('tujuan-online-query').value=''; $('custom-tujuan-wrapper').classList.add('hidden');
@@ -1564,7 +1594,7 @@
             $('btn-submit').querySelector('span').textContent='Simpan Perubahan';
             $('btn-cancel-edit').classList.remove('hidden');
             renderFormStrukItems(); calculateBBM();
-            window.scrollTo({top:0,behavior:'smooth'});
+            openBookingFormModal();
         }
 
         function deleteBooking(id) {
@@ -1589,12 +1619,24 @@
         }
 
         function memoAttachmentOf(b){
-            return b?.memoDataUrl || b?.memoUrl || b?.memoURL || b?.memoDriveUrl || b?.memoFile?.url || b?.memoFile?.driveUrl || b?.memoWebViewLink || b?.memoDownloadUrl || null;
+            const candidates=[b?.memoDataUrl,b?.memoUrl,b?.memoURL,b?.memoDriveUrl,b?.memoFile?.url,b?.memoFile?.driveUrl,b?.memoWebViewLink,b?.memoDownloadUrl,b?.documents?.memo?.url,b?.documents?.memo?.driveUrl];
+            return candidates.find(v=>typeof v==='string' ? v.trim()!=='' : !!(v && (v.url||v.driveUrl||v.dataUrl))) || null;
         }
         function memoIsEffectivelyPaid(b){
             const amount=Math.max(0,Number(b?.nominalMemo ?? b?.nominal_pengalihan_bbm ?? b?.nominal)||0);
-            const hasMemo=!!memoAttachmentOf(b);
-            return b?.statusMemo==='Sudah Cair' || (hasMemo && amount>0);
+            // Status otomatis cair bila lampiran memo tersedia dan nominal memo sudah diisi.
+            return b?.statusMemo==='Sudah Cair' || (!!memoAttachmentOf(b) && amount>0);
+        }
+        function normalizeMemoPaidStatuses(){
+            let changed=false;
+            bookings.forEach(b=>{
+                if(memoIsEffectivelyPaid(b) && b.statusMemo!=='Sudah Cair'){
+                    b.statusMemo='Sudah Cair';
+                    changed=true;
+                }
+            });
+            if(changed) persistBookings();
+            return changed;
         }
 
         function renderRealisasi(){
@@ -1640,18 +1682,28 @@
 
         function renderTable() {
             const q=($('search-input')?.value||'').trim().toLowerCase(), fm=$('filter-memo')?.value||'ALL', fs=$('filter-struk')?.value||'ALL';
+            const sortBy=$('sort-bookings')?.value||'date-desc';
             const filtered=bookings.filter(b=>{
                 const matches=[b.peminjam,b.kendaraan,b.driver,b.tujuanNama,b.noMemo,b.noStruk,b.tanggal].some(v=>String(v||'').toLowerCase().includes(q));
-                return matches&&(fm==='ALL'||(b.statusMemo||'Belum Diajukan')===fm)&&(fs==='ALL'||(b.statusStruk||'Belum Ada')===fs)&&(currentTab==='bpu'?b.bpuStatus==='Terkirim ke BPU':b.bpuStatus!=='Terkirim ke BPU');
+                return matches&&(fm==='ALL'||(memoIsEffectivelyPaid(b)?'Sudah Cair':(b.statusMemo||'Belum Diajukan'))===fm)&&(fs==='ALL'||(b.statusStruk||'Belum Ada')===fs)&&(currentTab==='bpu'?b.bpuStatus==='Terkirim ke BPU':b.bpuStatus!=='Terkirim ke BPU');
+            });
+            const dateValue=b=>String(b.tanggal||'');
+            filtered.sort((a,b)=>{
+                if(sortBy==='date-asc') return dateValue(a).localeCompare(dateValue(b));
+                if(sortBy==='borrower-asc') return String(a.peminjam||'').localeCompare(String(b.peminjam||''),'id',{sensitivity:'base'});
+                if(sortBy==='borrower-desc') return String(b.peminjam||'').localeCompare(String(a.peminjam||''),'id',{sensitivity:'base'});
+                if(sortBy==='destination-asc') return String(a.tujuanNama||'').localeCompare(String(b.tujuanNama||''),'id',{sensitivity:'base'});
+                if(sortBy==='memo-status') return String(memoIsEffectivelyPaid(a)?'Sudah Cair':(a.statusMemo||'Belum Diajukan')).localeCompare(String(memoIsEffectivelyPaid(b)?'Sudah Cair':(b.statusMemo||'Belum Diajukan')),'id');
+                return dateValue(b).localeCompare(dateValue(a));
             });
             $('badge-count-active').textContent=bookings.filter(b=>b.bpuStatus!=='Terkirim ke BPU').length;
             $('badge-count-bpu').textContent=bookings.filter(b=>b.bpuStatus==='Terkirim ke BPU').length;
-            $('table-body').innerHTML=filtered.map(b=>{
+            $('table-body').innerHTML=filtered.map((b,index)=>{
                 const receiptRows = (Array.isArray(b.strukList)?b.strukList:[]).filter(x=>x && (x.dataUrl||x.driveUrl||x.url||x.webViewLink||Number(x.nominal)>0||x.noNota||x.platNomor));
                 const hasStrukDoc = receiptRows.some(x=>x.dataUrl||x.driveUrl||x.url||x.webViewLink);
                 const hasMemoDoc = Boolean(b.memoDataUrl || b.memoUrl || b.memoURL || b.memoDriveUrl || b.memoFile?.url || b.memoFile?.driveUrl || b.documents?.memo?.url);
                 const receiptDetails = receiptRows.map((x,i)=>`<div class="mt-1 border-t border-slate-100 pt-1 text-[10px] leading-snug"><b>Struk ${i+1}</b><div>No: ${esc(x.noNota||x.nomor_struk||'Belum terbaca')}</div><div>Rp ${Number(x.nominal||0).toLocaleString('id-ID')}</div><div>Plat: ${esc(x.platNomor||x.plat_nomor||b.strukPlatNomor||'Tidak tercantum')}</div>${(x.driveUrl||x.url||x.webViewLink)?`<a href="${esc(x.driveUrl||x.url||x.webViewLink)}" target="_blank" rel="noopener" class="text-uns-blue underline">Buka struk</a>`:''}</div>`).join('');
-                return `<tr class="align-top hover:bg-slate-50"><td class="p-3 whitespace-nowrap">${esc(b.tanggal||'-')}${b.tanggalSelesai&&b.tanggalSelesai!==b.tanggal?`<div class="text-slate-500 text-[10px] mt-1">s.d. ${esc(b.tanggalSelesai)}</div><div class="text-blue-700 text-[10px]">${Math.max(1,Number(b.durasiHari)||1)} hari</div>`:''}</td><td class="p-3 min-w-36"><b>${esc(b.peminjam)}</b></td><td class="p-3 min-w-36">${esc(b.kendaraan)}<div class="text-slate-500 mt-1">${esc(b.driver)}</div></td><td class="p-3 min-w-32">${esc(b.tujuanNama||'-')}<div class="text-slate-500 mt-1">${Number(b.totalKm)||0} km</div></td><td class="p-3 whitespace-nowrap"><b>${rupiah(b.estimasiBiaya)}</b><div class="text-slate-500">${Number(b.estimasiLiter||0).toLocaleString('id-ID',{maximumFractionDigits:2})} L</div></td><td class="p-3 whitespace-nowrap">${b.pakaiEtoll?`<b>${rupiah(b.estimasiEtoll)}</b><div class="text-amber-700 text-[10px]">Pakai tol</div>`:'<span class="text-slate-400">Tidak pakai tol</span>'}</td><td class="p-3 min-w-36">${esc((receiptRows.some(x=>x.dataUrl||x.driveUrl||x.url||x.webViewLink) && (!b.statusStruk||b.statusStruk==='Belum Ada'||b.statusStruk==='Belum Ada Struk')) ? 'Terlampir' : (b.statusStruk||'Belum Ada'))}<div class="font-semibold text-slate-700">Total: ${rupiah(b.realisasiStruk || receiptRows.reduce((n,x)=>n+(Number(x.nominal)||0),0))}</div>${receiptDetails}${hasStrukDoc?`<button onclick="previewDocs('${b.id}','struk')" class="text-uns-blue underline mt-1">Lihat semua lampiran</button>`:''}</td><td class="p-3 min-w-28">${esc(memoIsEffectivelyPaid(b)?'Sudah Cair':(b.statusMemo||'Belum Diajukan'))}<div class="text-indigo-700">Dari: ${esc(b.memoDari||'Perencanaan')}</div><div class="font-semibold text-slate-800">Nominal: ${rupiah(b.nominalMemo||0)}</div><div class="text-slate-500">${esc(b.noMemo||'Tanpa nomor memo')}</div>${hasMemoDoc?`<button onclick="previewDocs('${b.id}','memo')" class="text-uns-blue underline mt-1">Lihat memo</button>`:''}</td><td class="p-3 no-print min-w-36"><div class="space-y-2"><select onchange="setBpu('${b.id}',this.value)" class="w-full border rounded px-2 py-1 text-xs"><option ${b.bpuStatus!=='Terkirim ke BPU'?'selected':''}>Belum Dikirim</option><option ${b.bpuStatus==='Terkirim ke BPU'?'selected':''}>Terkirim ke BPU</option></select><div class="flex gap-2"><button onclick="editBooking('${b.id}')" class="text-uns-blue font-semibold">Edit</button><button onclick="deleteBooking('${b.id}')" class="text-rose-600 font-semibold">Hapus</button></div></div></td></tr>`;
+                return `<tr class="align-top hover:bg-slate-50"><td class="p-3 text-center font-bold text-slate-500">${index+1}</td><td class="p-3 whitespace-nowrap"><div>${esc(b.tanggal||'-')}</div>${b.tanggalSelesai&&b.tanggalSelesai!==b.tanggal?`<div class="text-slate-500 text-[10px] mt-1">s.d. ${esc(b.tanggalSelesai)}</div><div class="text-blue-700 text-[10px]">${Math.max(1,Number(b.durasiHari)||1)} hari</div>`:''}</td><td class="p-3 min-w-36"><b>${esc(b.peminjam)}</b></td><td class="p-3 min-w-36">${esc(b.kendaraan)}<div class="text-slate-500 mt-1">${esc(b.driver)}</div></td><td class="p-3 min-w-32">${esc(b.tujuanNama||'-')}<div class="text-slate-500 mt-1">${Number(b.totalKm)||0} km</div></td><td class="p-3 whitespace-nowrap"><b>${rupiah(b.estimasiBiaya)}</b><div class="text-slate-500">${Number(b.estimasiLiter||0).toLocaleString('id-ID',{maximumFractionDigits:2})} L</div></td><td class="p-3 whitespace-nowrap">${b.pakaiEtoll?`<b>${rupiah(b.estimasiEtoll)}</b><div class="text-amber-700 text-[10px]">Pakai tol</div>`:'<span class="text-slate-400">Tidak pakai tol</span>'}</td><td class="p-3 min-w-36">${esc((receiptRows.some(x=>x.dataUrl||x.driveUrl||x.url||x.webViewLink) && (!b.statusStruk||b.statusStruk==='Belum Ada'||b.statusStruk==='Belum Ada Struk')) ? 'Terlampir' : (b.statusStruk||'Belum Ada'))}<div class="font-semibold text-slate-700">Total: ${rupiah(b.realisasiStruk || receiptRows.reduce((n,x)=>n+(Number(x.nominal)||0),0))}</div>${receiptDetails}${hasStrukDoc?`<button onclick="previewDocs('${b.id}','struk')" class="text-uns-blue underline mt-1">Lihat semua lampiran</button>`:''}</td><td class="p-3 min-w-28">${esc(memoIsEffectivelyPaid(b)?'Sudah Cair':(b.statusMemo||'Belum Diajukan'))}<div class="text-indigo-700">Dari: ${esc(b.memoDari||'Perencanaan')}</div><div class="font-semibold text-slate-800">Nominal: ${rupiah(b.nominalMemo||0)}</div><div class="text-slate-500">${esc(b.noMemo||'Tanpa nomor memo')}</div>${hasMemoDoc?`<button onclick="previewDocs('${b.id}','memo')" class="text-uns-blue underline mt-1">Lihat memo</button>`:''}</td><td class="p-3 no-print min-w-36"><div class="space-y-2"><select onchange="setBpu('${b.id}',this.value)" class="w-full border rounded px-2 py-1 text-xs"><option ${b.bpuStatus!=='Terkirim ke BPU'?'selected':''}>Belum Dikirim</option><option ${b.bpuStatus==='Terkirim ke BPU'?'selected':''}>Terkirim ke BPU</option></select><div class="flex gap-2"><button onclick="editBooking('${b.id}')" class="text-uns-blue font-semibold">Edit</button><button onclick="deleteBooking('${b.id}')" class="text-rose-600 font-semibold">Hapus</button></div></div></td></tr>`;
             }).join('');
             $('empty-state').classList.toggle('hidden',filtered.length>0);
             const totalKm=bookings.reduce((s,b)=>s+(Number(b.totalKm)||0),0), totalBbm=bookings.reduce((s,b)=>s+(Number(b.estimasiBiaya)||0),0), liter=bookings.reduce((s,b)=>s+(Number(b.estimasiLiter)||0),0);
@@ -1662,7 +1714,7 @@
             const withReceipt=bookings.filter(b=>b.statusStruk==='Terlampir').length;
             $('stat-struk').textContent=`${withReceipt} / ${bookings.length}`;
             $('stat-struk-desc').textContent=bookings.length-withReceipt+' perjalanan belum berstatus terlampir';
-            const paid=bookings.filter(b=>b.statusMemo==='Sudah Cair').length;
+            const paid=bookings.filter(memoIsEffectivelyPaid).length;
             $('stat-memo').textContent=`${paid} / ${bookings.length}`;
             $('stat-memo-desc').textContent=bookings.length-paid+' memo belum cair';
         }
@@ -1700,6 +1752,7 @@
         $('tanggal-selesai').min=$('tanggal').value;
         renderFormStrukItems();
         calculateBBM();
+        normalizeMemoPaidStatuses();
         renderTable();
         setTimeout(muatTujuanOnline, 300);
     </script>
