@@ -1259,8 +1259,17 @@
             if(kind==='receipt' && simkendisAiSettings.scanReceiptEnabled===false) throw new Error('Scan nota BBM dinonaktifkan pada pengaturan bersama.');
             if(kind==='memo' && simkendisAiSettings.scanMemoEnabled===false) throw new Error('Scan memo dinonaktifkan pada pengaturan bersama.');
             const file=dataUrlParts(dataUrl);
-            const token = await window.SIMKENDIS_FIREBASE?.getIdToken?.();
-            if(!token) throw new Error('Token autentikasi Firebase tidak tersedia untuk scan aman.');
+            let token = await window.SIMKENDIS_FIREBASE?.getIdToken?.();
+            // Satu percobaan ulang untuk sesi yang belum selesai dibuat atau token kedaluwarsa.
+            if (!token) token = await window.SIMKENDIS_FIREBASE?.refreshIdToken?.();
+            if(!token) {
+                const detail = window.SIMKENDIS_FIREBASE?.getAuthError?.() || '';
+                let hint = 'Pastikan Firebase Authentication > Sign-in method > Anonymous aktif untuk proyek fleet-transaction-management.';
+                if (/unauthorized-domain/i.test(detail)) hint = 'Tambahkan domain tempat index.html dijalankan ke Firebase Authentication > Settings > Authorized domains.';
+                else if (/invalid-api-key/i.test(detail)) hint = 'API key Firebase pada konfigurasi SIMKENDIS_CONFIG tidak valid atau dibatasi.';
+                else if (/network-request-failed/i.test(detail)) hint = 'Periksa koneksi internet, pemblokir jaringan, dan akses ke identitytoolkit.googleapis.com.';
+                throw new Error('Autentikasi Firebase gagal' + (detail ? ' ('+detail+')' : '') + '. ' + hint);
+            }
             setGeminiStatus('Mengirim dokumen ke Worker aman…');
             const response=await fetch(SIMKENDIS_WORKER_URL + '/scan', {method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify({type:kind==='memo'?'memo':'receipt',mimeType:file.mimeType,data:file.data})});
             const payload=await response.json().catch(()=>({}));
@@ -1750,6 +1759,7 @@
 
         let adminAuthBlocked = false;
         let mainAuthBlocked = false;
+        let mainAuthLastError = '';
         let activeCloudEndpoint = null; // Menyimpan endpoint yang terbukti mengizinkan baca/tulis
 
         async function getAdminToken(forceRefresh = false) {
@@ -1766,14 +1776,27 @@
         }
 
         async function getMainToken(forceRefresh = false) {
-            if (mainAuthBlocked) return null;
             try {
-                if (!mainAuth.currentUser) await signInAnonymously(mainAuth);
-                return await mainAuth.currentUser.getIdToken(forceRefresh);
+                // Coba login anonim kembali jika belum ada sesi. Jangan menyembunyikan
+                // penyebab autentikasi gagal; scan AI memerlukan ID token yang valid.
+                if (!mainAuth.currentUser) {
+                    mainAuthBlocked = false;
+                    await signInAnonymously(mainAuth);
+                }
+                const user = mainAuth.currentUser;
+                if (!user) throw new Error('Firebase tidak membuat sesi pengguna anonim.');
+                const token = await user.getIdToken(!!forceRefresh);
+                if (!token) throw new Error('Firebase mengembalikan ID token kosong.');
+                mainAuthLastError = '';
+                return token;
             } catch (err) {
-                if (/admin-restricted-operation|operation-not-allowed/i.test(String(err?.code || err?.message || ''))) {
+                const code = String(err?.code || '');
+                const message = String(err?.message || err || 'Kesalahan tidak diketahui');
+                mainAuthLastError = (code ? code + ': ' : '') + message;
+                if (/admin-restricted-operation|operation-not-allowed/i.test(code + ' ' + message)) {
                     mainAuthBlocked = true;
                 }
+                console.warn('SIMKENDIS Firebase Authentication gagal:', mainAuthLastError);
                 return null;
             }
         }
@@ -2090,6 +2113,8 @@
                 return r2.ok ? r2.data : null;
             },
             async getIdToken() { return await getMainToken(false); },
+            async refreshIdToken() { return await getMainToken(true); },
+            getAuthError() { return mainAuthLastError; },
             get ready() { return ready; }
         };
 
