@@ -1259,17 +1259,8 @@
             if(kind==='receipt' && simkendisAiSettings.scanReceiptEnabled===false) throw new Error('Scan nota BBM dinonaktifkan pada pengaturan bersama.');
             if(kind==='memo' && simkendisAiSettings.scanMemoEnabled===false) throw new Error('Scan memo dinonaktifkan pada pengaturan bersama.');
             const file=dataUrlParts(dataUrl);
-            let token = await window.SIMKENDIS_FIREBASE?.getIdToken?.();
-            // Satu percobaan ulang untuk sesi yang belum selesai dibuat atau token kedaluwarsa.
-            if (!token) token = await window.SIMKENDIS_FIREBASE?.refreshIdToken?.();
-            if(!token) {
-                const detail = window.SIMKENDIS_FIREBASE?.getAuthError?.() || '';
-                let hint = 'Pastikan Firebase Authentication > Sign-in method > Anonymous aktif untuk proyek fleet-transaction-management.';
-                if (/unauthorized-domain/i.test(detail)) hint = 'Tambahkan domain tempat index.html dijalankan ke Firebase Authentication > Settings > Authorized domains.';
-                else if (/invalid-api-key/i.test(detail)) hint = 'API key Firebase pada konfigurasi SIMKENDIS_CONFIG tidak valid atau dibatasi.';
-                else if (/network-request-failed/i.test(detail)) hint = 'Periksa koneksi internet, pemblokir jaringan, dan akses ke identitytoolkit.googleapis.com.';
-                throw new Error('Autentikasi Firebase gagal' + (detail ? ' ('+detail+')' : '') + '. ' + hint);
-            }
+            const token = await window.SIMKENDIS_FIREBASE?.getIdToken?.();
+            if(!token) throw new Error('Token autentikasi Firebase tidak tersedia untuk scan aman.');
             setGeminiStatus('Mengirim dokumen ke Worker aman…');
             const response=await fetch(SIMKENDIS_WORKER_URL + '/scan', {method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify({type:kind==='memo'?'memo':'receipt',mimeType:file.mimeType,data:file.data})});
             const payload=await response.json().catch(()=>({}));
@@ -1487,7 +1478,7 @@
                 strukList,
                 realisasiStruk:strukList.reduce((sum,s)=>sum+s.nominal,0),
                 noStruk:strukList.map(s=>s.noNota).filter(Boolean).join(', '),
-                statusMemo:$('status-memo').value,
+                statusMemo:((tempUploads.memoDataUrl || old?.memoDataUrl || old?.memoUrl || old?.memoURL || old?.memoDriveUrl || old?.memoFile?.url || old?.memoFile?.driveUrl) && (Number($('nominal-memo').value)||0)>0) ? 'Sudah Cair' : $('status-memo').value,
                 memoDari:$('memo-dari').value||'Perencanaan',
                 memoUnitKerja:window.__simkendisScannedMemoUnit||old?.memoUnitKerja||'',
                 nominalMemo:Math.max(0,Number($('nominal-memo').value)||0),
@@ -1538,7 +1529,7 @@
             $('jarak-satu-arah').value=b.jarakSatuArah||1;
             $('tipe-perjalanan').value=b.tipePerjalanan||'2.2';
             $('status-struk').value=b.statusStruk||'Belum Ada';
-            $('status-memo').value=b.statusMemo||'Belum Diajukan';
+            $('status-memo').value=memoIsEffectivelyPaid(b)?'Sudah Cair':(b.statusMemo||'Belum Diajukan');
             $('memo-dari').value=memoSources.includes(b.memoDari)?b.memoDari:(memoSources.includes(b.memoUnitKerja)?b.memoUnitKerja:(memoSources[0]||'Perencanaan'));
             $('nominal-memo').value=Number(b.nominalMemo ?? b.nominal_pengalihan_bbm)||0;
             $('no-memo').value=b.noMemo||b.nomor_ajuan||'';
@@ -1597,6 +1588,15 @@
             if(tab==='realisasi') renderRealisasi(); else renderTable();
         }
 
+        function memoAttachmentOf(b){
+            return b?.memoDataUrl || b?.memoUrl || b?.memoURL || b?.memoDriveUrl || b?.memoFile?.url || b?.memoFile?.driveUrl || b?.memoWebViewLink || b?.memoDownloadUrl || null;
+        }
+        function memoIsEffectivelyPaid(b){
+            const amount=Math.max(0,Number(b?.nominalMemo ?? b?.nominal_pengalihan_bbm ?? b?.nominal)||0);
+            const hasMemo=!!memoAttachmentOf(b);
+            return b?.statusMemo==='Sudah Cair' || (hasMemo && amount>0);
+        }
+
         function renderRealisasi(){
             const all=[...bookings];
             const sources=[...new Set([...memoSources,...all.map(b=>b.memoDari||'Perencanaan')].filter(Boolean))];
@@ -1612,7 +1612,7 @@
                 const key=memoKey(b), src=b.memoDari||'Perencanaan';
                 if(!groups.has(key)) groups.set(key,{key,src,no:String(b.noMemo||'').trim(),memo:0,fuel:0,paid:false,borrowers:new Set(),vehicles:new Set(),dates:new Set(),trips:0});
                 const g=groups.get(key);
-                if(b.statusMemo==='Sudah Cair') { g.paid=true; g.memo=Math.max(g.memo,Number(b.nominalMemo)||0); }
+                if(memoIsEffectivelyPaid(b)) { g.paid=true; g.memo=Math.max(g.memo,Number(b.nominalMemo ?? b.nominal_pengalihan_bbm ?? b.nominal)||0); }
                 g.fuel+=used(b); g.trips++;
                 if(b.peminjam)g.borrowers.add(String(b.peminjam));
                 if(b.unit)g.borrowers.add(String(b.unit));
@@ -1651,7 +1651,7 @@
                 const hasStrukDoc = receiptRows.some(x=>x.dataUrl||x.driveUrl||x.url||x.webViewLink);
                 const hasMemoDoc = Boolean(b.memoDataUrl || b.memoUrl || b.memoURL || b.memoDriveUrl || b.memoFile?.url || b.memoFile?.driveUrl || b.documents?.memo?.url);
                 const receiptDetails = receiptRows.map((x,i)=>`<div class="mt-1 border-t border-slate-100 pt-1 text-[10px] leading-snug"><b>Struk ${i+1}</b><div>No: ${esc(x.noNota||x.nomor_struk||'Belum terbaca')}</div><div>Rp ${Number(x.nominal||0).toLocaleString('id-ID')}</div><div>Plat: ${esc(x.platNomor||x.plat_nomor||b.strukPlatNomor||'Tidak tercantum')}</div>${(x.driveUrl||x.url||x.webViewLink)?`<a href="${esc(x.driveUrl||x.url||x.webViewLink)}" target="_blank" rel="noopener" class="text-uns-blue underline">Buka struk</a>`:''}</div>`).join('');
-                return `<tr class="align-top hover:bg-slate-50"><td class="p-3 whitespace-nowrap">${esc(b.tanggal||'-')}${b.tanggalSelesai&&b.tanggalSelesai!==b.tanggal?`<div class="text-slate-500 text-[10px] mt-1">s.d. ${esc(b.tanggalSelesai)}</div><div class="text-blue-700 text-[10px]">${Math.max(1,Number(b.durasiHari)||1)} hari</div>`:''}</td><td class="p-3 min-w-36"><b>${esc(b.peminjam)}</b></td><td class="p-3 min-w-36">${esc(b.kendaraan)}<div class="text-slate-500 mt-1">${esc(b.driver)}</div></td><td class="p-3 min-w-32">${esc(b.tujuanNama||'-')}<div class="text-slate-500 mt-1">${Number(b.totalKm)||0} km</div></td><td class="p-3 whitespace-nowrap"><b>${rupiah(b.estimasiBiaya)}</b><div class="text-slate-500">${Number(b.estimasiLiter||0).toLocaleString('id-ID',{maximumFractionDigits:2})} L</div></td><td class="p-3 whitespace-nowrap">${b.pakaiEtoll?`<b>${rupiah(b.estimasiEtoll)}</b><div class="text-amber-700 text-[10px]">Pakai tol</div>`:'<span class="text-slate-400">Tidak pakai tol</span>'}</td><td class="p-3 min-w-36">${esc((receiptRows.some(x=>x.dataUrl||x.driveUrl||x.url||x.webViewLink) && (!b.statusStruk||b.statusStruk==='Belum Ada'||b.statusStruk==='Belum Ada Struk')) ? 'Terlampir' : (b.statusStruk||'Belum Ada'))}<div class="font-semibold text-slate-700">Total: ${rupiah(b.realisasiStruk || receiptRows.reduce((n,x)=>n+(Number(x.nominal)||0),0))}</div>${receiptDetails}${hasStrukDoc?`<button onclick="previewDocs('${b.id}','struk')" class="text-uns-blue underline mt-1">Lihat semua lampiran</button>`:''}</td><td class="p-3 min-w-28">${esc(b.statusMemo||'Belum Diajukan')}<div class="text-indigo-700">Dari: ${esc(b.memoDari||'Perencanaan')}</div><div class="font-semibold text-slate-800">Nominal: ${rupiah(b.nominalMemo||0)}</div><div class="text-slate-500">${esc(b.noMemo||'Tanpa nomor memo')}</div>${hasMemoDoc?`<button onclick="previewDocs('${b.id}','memo')" class="text-uns-blue underline mt-1">Lihat memo</button>`:''}</td><td class="p-3 no-print min-w-36"><div class="space-y-2"><select onchange="setBpu('${b.id}',this.value)" class="w-full border rounded px-2 py-1 text-xs"><option ${b.bpuStatus!=='Terkirim ke BPU'?'selected':''}>Belum Dikirim</option><option ${b.bpuStatus==='Terkirim ke BPU'?'selected':''}>Terkirim ke BPU</option></select><div class="flex gap-2"><button onclick="editBooking('${b.id}')" class="text-uns-blue font-semibold">Edit</button><button onclick="deleteBooking('${b.id}')" class="text-rose-600 font-semibold">Hapus</button></div></div></td></tr>`;
+                return `<tr class="align-top hover:bg-slate-50"><td class="p-3 whitespace-nowrap">${esc(b.tanggal||'-')}${b.tanggalSelesai&&b.tanggalSelesai!==b.tanggal?`<div class="text-slate-500 text-[10px] mt-1">s.d. ${esc(b.tanggalSelesai)}</div><div class="text-blue-700 text-[10px]">${Math.max(1,Number(b.durasiHari)||1)} hari</div>`:''}</td><td class="p-3 min-w-36"><b>${esc(b.peminjam)}</b></td><td class="p-3 min-w-36">${esc(b.kendaraan)}<div class="text-slate-500 mt-1">${esc(b.driver)}</div></td><td class="p-3 min-w-32">${esc(b.tujuanNama||'-')}<div class="text-slate-500 mt-1">${Number(b.totalKm)||0} km</div></td><td class="p-3 whitespace-nowrap"><b>${rupiah(b.estimasiBiaya)}</b><div class="text-slate-500">${Number(b.estimasiLiter||0).toLocaleString('id-ID',{maximumFractionDigits:2})} L</div></td><td class="p-3 whitespace-nowrap">${b.pakaiEtoll?`<b>${rupiah(b.estimasiEtoll)}</b><div class="text-amber-700 text-[10px]">Pakai tol</div>`:'<span class="text-slate-400">Tidak pakai tol</span>'}</td><td class="p-3 min-w-36">${esc((receiptRows.some(x=>x.dataUrl||x.driveUrl||x.url||x.webViewLink) && (!b.statusStruk||b.statusStruk==='Belum Ada'||b.statusStruk==='Belum Ada Struk')) ? 'Terlampir' : (b.statusStruk||'Belum Ada'))}<div class="font-semibold text-slate-700">Total: ${rupiah(b.realisasiStruk || receiptRows.reduce((n,x)=>n+(Number(x.nominal)||0),0))}</div>${receiptDetails}${hasStrukDoc?`<button onclick="previewDocs('${b.id}','struk')" class="text-uns-blue underline mt-1">Lihat semua lampiran</button>`:''}</td><td class="p-3 min-w-28">${esc(memoIsEffectivelyPaid(b)?'Sudah Cair':(b.statusMemo||'Belum Diajukan'))}<div class="text-indigo-700">Dari: ${esc(b.memoDari||'Perencanaan')}</div><div class="font-semibold text-slate-800">Nominal: ${rupiah(b.nominalMemo||0)}</div><div class="text-slate-500">${esc(b.noMemo||'Tanpa nomor memo')}</div>${hasMemoDoc?`<button onclick="previewDocs('${b.id}','memo')" class="text-uns-blue underline mt-1">Lihat memo</button>`:''}</td><td class="p-3 no-print min-w-36"><div class="space-y-2"><select onchange="setBpu('${b.id}',this.value)" class="w-full border rounded px-2 py-1 text-xs"><option ${b.bpuStatus!=='Terkirim ke BPU'?'selected':''}>Belum Dikirim</option><option ${b.bpuStatus==='Terkirim ke BPU'?'selected':''}>Terkirim ke BPU</option></select><div class="flex gap-2"><button onclick="editBooking('${b.id}')" class="text-uns-blue font-semibold">Edit</button><button onclick="deleteBooking('${b.id}')" class="text-rose-600 font-semibold">Hapus</button></div></div></td></tr>`;
             }).join('');
             $('empty-state').classList.toggle('hidden',filtered.length>0);
             const totalKm=bookings.reduce((s,b)=>s+(Number(b.totalKm)||0),0), totalBbm=bookings.reduce((s,b)=>s+(Number(b.estimasiBiaya)||0),0), liter=bookings.reduce((s,b)=>s+(Number(b.estimasiLiter)||0),0);
@@ -1759,7 +1759,6 @@
 
         let adminAuthBlocked = false;
         let mainAuthBlocked = false;
-        let mainAuthLastError = '';
         let activeCloudEndpoint = null; // Menyimpan endpoint yang terbukti mengizinkan baca/tulis
 
         async function getAdminToken(forceRefresh = false) {
@@ -1776,27 +1775,14 @@
         }
 
         async function getMainToken(forceRefresh = false) {
+            if (mainAuthBlocked) return null;
             try {
-                // Coba login anonim kembali jika belum ada sesi. Jangan menyembunyikan
-                // penyebab autentikasi gagal; scan AI memerlukan ID token yang valid.
-                if (!mainAuth.currentUser) {
-                    mainAuthBlocked = false;
-                    await signInAnonymously(mainAuth);
-                }
-                const user = mainAuth.currentUser;
-                if (!user) throw new Error('Firebase tidak membuat sesi pengguna anonim.');
-                const token = await user.getIdToken(!!forceRefresh);
-                if (!token) throw new Error('Firebase mengembalikan ID token kosong.');
-                mainAuthLastError = '';
-                return token;
+                if (!mainAuth.currentUser) await signInAnonymously(mainAuth);
+                return await mainAuth.currentUser.getIdToken(forceRefresh);
             } catch (err) {
-                const code = String(err?.code || '');
-                const message = String(err?.message || err || 'Kesalahan tidak diketahui');
-                mainAuthLastError = (code ? code + ': ' : '') + message;
-                if (/admin-restricted-operation|operation-not-allowed/i.test(code + ' ' + message)) {
+                if (/admin-restricted-operation|operation-not-allowed/i.test(String(err?.code || err?.message || ''))) {
                     mainAuthBlocked = true;
                 }
-                console.warn('SIMKENDIS Firebase Authentication gagal:', mainAuthLastError);
                 return null;
             }
         }
@@ -2113,8 +2099,6 @@
                 return r2.ok ? r2.data : null;
             },
             async getIdToken() { return await getMainToken(false); },
-            async refreshIdToken() { return await getMainToken(true); },
-            getAuthError() { return mainAuthLastError; },
             get ready() { return ready; }
         };
 
