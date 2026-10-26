@@ -1330,11 +1330,11 @@
             try {
               const src = tempUploads.memoLocalDataUrl || tempUploads.memoDataUrl;
               const existingBooking = bookings.find(b => b.id === $('edit-id').value);
-              const driveRef = src || tempUploads.memoDriveUrl || tempUploads.memoFile || existingBooking?.memoFile || existingBooking?.memoUrl || existingBooking?.memoDataUrl;
+              const driveRef = src || tempUploads.memoFile || tempUploads.memoDriveUrl || existingBooking?.memoFile || existingBooking?.memoUrl || existingBooking?.memoDataUrl;
               if(!driveRef) return toast('Belum ada lampiran memo yang tersimpan. Unggah memo terlebih dahulu.',true);
               const r = (typeof driveRef === 'string' && driveRef.startsWith('data:'))
                 ? await geminiExtract(driveRef,'memo')
-                : await (simkendisDriveId(driveRef) ? geminiExtractDrive(driveRef,'memo') : geminiExtract(driveRef,'memo'));
+                : (simkendisDriveId(driveRef) ? await geminiExtractDrive(driveRef,'memo') : await geminiExtract(driveRef,'memo'));
               if(r.nomor_ajuan || r.nomor_memo) $('no-memo').value=String(r.nomor_ajuan || r.nomor_memo).trim();
               const memoAmount = Number(r.nominal_pengalihan_bbm ?? r.nominal) || 0;
               if(memoAmount>0) $('nominal-memo').value=formatNominalDisplay(Math.round(memoAmount));
@@ -1354,7 +1354,7 @@
               if(!driveRef) return toast('Belum ada lampiran struk pada baris ini. Unggah struk terlebih dahulu.',true);
               const r = (typeof driveRef === 'string' && driveRef.startsWith('data:'))
                 ? await geminiExtract(driveRef,'receipt')
-                : await (simkendisDriveId(driveRef) ? geminiExtractDrive(driveRef,'receipt',s.mimeType || '') : geminiExtract(driveRef,'receipt'));
+                : (simkendisDriveId(driveRef) ? await geminiExtractDrive(driveRef,'receipt',s.mimeType || '') : await geminiExtract(driveRef,'receipt'));
               if(Number(r.nominal)>0) s.nominal=Math.round(Number(r.nominal));
               if(r.nomor_struk) s.noNota=String(r.nomor_struk).trim();
               if(r.no_transaksi || r.nomor_transaksi || r.transaction_no) s.noTransaksi=String(r.no_transaksi||r.nomor_transaksi||r.transaction_no).trim();
@@ -2065,6 +2065,7 @@
 
         let adminAuthBlocked = false;
         let mainAuthBlocked = false;
+        let mainAuthLastError = '';
         let activeCloudEndpoint = null; // Menyimpan endpoint yang terbukti mengizinkan baca/tulis
 
         async function getAdminToken(forceRefresh = false) {
@@ -2081,14 +2082,28 @@
         }
 
         async function getMainToken(forceRefresh = false) {
-            if (mainAuthBlocked) return null;
+            if (mainAuthBlocked) {
+                mainAuthLastError = 'Firebase Anonymous sign-in tidak aktif atau diblokir.';
+                return null;
+            }
             try {
                 if (!mainAuth.currentUser) await signInAnonymously(mainAuth);
-                return await mainAuth.currentUser.getIdToken(forceRefresh);
+                const user = mainAuth.currentUser;
+                if (!user) {
+                    mainAuthLastError = 'Firebase belum menghasilkan user autentikasi.';
+                    return null;
+                }
+                const token = await user.getIdToken(forceRefresh);
+                mainAuthLastError = '';
+                return token || null;
             } catch (err) {
-                if (/admin-restricted-operation|operation-not-allowed/i.test(String(err?.code || err?.message || ''))) {
+                const code = String(err?.code || '');
+                const message = String(err?.message || err || '');
+                mainAuthLastError = code ? code + ': ' + message : message;
+                if (/admin-restricted-operation|operation-not-allowed/i.test(code + ' ' + message)) {
                     mainAuthBlocked = true;
                 }
+                console.warn('SIMKENDIS Firebase token gagal:', mainAuthLastError);
                 return null;
             }
         }
@@ -2446,7 +2461,20 @@
                 const saved = await this.setSettings(merged);
                 return saved === null ? {ok:false,error:'Firebase menolak penyimpanan pengaturan master'} : {ok:true,data:saved};
             },
-            async getIdToken() { return await getMainToken(false); },
+            async getIdToken() {
+                // Module may be initialized before anonymous sign-in finishes; retry briefly.
+                let token = await getMainToken(false);
+                if (token) return token;
+                await new Promise(resolve => setTimeout(resolve, 350));
+                token = await getMainToken(true);
+                if (!token) {
+                    const detail = mainAuthLastError || 'Token tidak tersedia.';
+                    throw new Error(/operation-not-allowed|admin-restricted-operation/i.test(detail)
+                        ? 'Firebase Anonymous Authentication belum diaktifkan. Aktifkan Authentication > Sign-in method > Anonymous di Firebase Console, lalu muat ulang.'
+                        : 'Gagal memperoleh token Firebase: ' + detail);
+                }
+                return token;
+            },
             get ready() { return ready; }
         };
 
