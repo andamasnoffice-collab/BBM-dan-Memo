@@ -392,7 +392,7 @@
                             </div>
                             <div>
                                 <label class="block text-[11px] text-slate-600 mb-1">Nominal Memo (Rp)</label>
-                                <input type="number" min="0" step="1000" id="nominal-memo" value="0" placeholder="Contoh: 1500000" class="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs bg-white">
+                                <input type="text" inputmode="numeric" autocomplete="off" id="nominal-memo" value="0" oninput="formatNominalField(this)" placeholder="Contoh: 1.500.000" class="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs bg-white">
                             </div>
                             <div>
                                 <label class="block text-[11px] text-slate-600 mb-1">Nomor Memo Perencanaan</label>
@@ -407,6 +407,7 @@
                                 <span id="label-file-memo" class="truncate">Unggah Scan/Foto Memo Perencanaan</span>
                                 <input type="file" id="file-memo" accept="image/*,application/pdf" onchange="handleImageUpload(this, 'label-file-memo', 'memoDataUrl')" class="hidden">
                             </label>
+                            <div id="memo-preview-host"></div>
                             <button type="button" onclick="scanMemoWithGemini()" class="mt-2 w-full px-3 py-2 rounded-lg bg-violet-700 hover:bg-violet-800 text-white text-xs font-bold"><i class="fa-solid fa-wand-magic-sparkles mr-1"></i> Scan Nomor & Nominal Memo dengan AI</button>
                             <button type="button" onclick="deleteMemoAttachment()" class="mt-2 w-full px-3 py-2 rounded-lg border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold"><i class="fa-solid fa-trash-can mr-1"></i> Hapus Lampiran Memo</button>
                         </div>
@@ -442,6 +443,15 @@
                     <button id="tab-btn-realisasi" onclick="switchTab('realisasi')" class="flex-1 py-2.5 px-4 rounded-xl text-xs sm:text-sm font-bold transition flex items-center justify-center gap-2 text-slate-600 hover:bg-slate-100">
                         <i class="fa-solid fa-chart-pie"></i><span>Realisasi Memo</span>
                     </button>
+                </div>
+
+                <!-- Kategori jadwal berdasarkan sumber memo -->
+                <div id="memo-source-tabs" class="bg-white p-3 rounded-2xl shadow-sm border border-slate-200/80 no-print">
+                    <div class="flex items-center justify-between gap-2 mb-2">
+                        <div><h3 class="text-xs font-extrabold text-slate-700">Kategori Sumber Memo</h3><p class="text-[10px] text-slate-500">Pilih unit/sumber memo untuk menyaring jadwal.</p></div>
+                        <button type="button" onclick="resetMemoSourceFilter()" class="text-[10px] font-bold text-uns-blue hover:underline">Tampilkan Semua</button>
+                    </div>
+                    <div id="memo-source-tab-buttons" class="flex flex-wrap gap-2"></div>
                 </div>
 
                 <!-- Filter & Search Bar -->
@@ -794,7 +804,7 @@
     </div>
 
     <!-- Toast Notification -->
-    <div id="toast" class="fixed bottom-5 right-5 z-50 hidden bg-slate-900 text-white px-4 py-3 rounded-xl shadow-lg border border-slate-700 items-center gap-3 text-xs sm:text-sm max-w-md">
+    <div id="toast" role="status" aria-live="polite" class="fixed bottom-5 right-5 z-[120] hidden bg-slate-900 text-white px-4 py-3 rounded-xl shadow-lg border border-slate-700 items-center gap-3 text-xs sm:text-sm max-w-md">
         <i id="toast-icon" class="fa-solid fa-circle-check text-emerald-400 text-base shrink-0"></i>
         <span id="toast-msg">Data berhasil disimpan!</span>
     </div>
@@ -830,6 +840,7 @@
         let masterVehicles = [];
         let masterDrivers = [];
         let memoSources = ['Perencanaan', 'Fakultas', 'Unit Kerja'];
+        let currentMemoSourceFilter = 'ALL';
 
         let formStrukList = [
             { id: 'S-' + Date.now(), nominal: '', noNota: '', dataUrl: null, fileName: '' }
@@ -873,6 +884,7 @@
         }
 
         let bookings = safeParse(STORAGE_KEY, []);
+        const startupLocalBookings = Array.isArray(bookings) ? structuredClone(bookings) : [];
         let savedMaster = safeParse(MASTER_STORAGE_KEY, null);
         masterVehicles = Array.isArray(savedMaster?.vehicles) ? savedMaster.vehicles : structuredClone(defaultVehicles);
         masterDrivers = Array.isArray(savedMaster?.drivers) ? savedMaster.drivers : structuredClone(defaultDrivers);
@@ -890,7 +902,7 @@
             const el=$('toast'); $('toast-msg').textContent=message;
             $('toast-icon').className=error?'fa-solid fa-circle-exclamation text-rose-400 text-base shrink-0':'fa-solid fa-circle-check text-emerald-400 text-base shrink-0';
             el.classList.remove('hidden'); el.classList.add('flex');
-            clearTimeout(window.__toastTimer); window.__toastTimer=setTimeout(()=>{el.classList.add('hidden');el.classList.remove('flex')},3800);
+            clearTimeout(window.__toastTimer); window.__toastTimer=setTimeout(()=>{el.classList.add('hidden');el.classList.remove('flex')},6500);
         }
 
         function openFirebaseDiagModal() {
@@ -943,9 +955,9 @@
                 if (window.SIMKENDIS_FIREBASE) {
                     window.SIMKENDIS_FIREBASE.saveBookings(cleanBookings).then(result => {
                         if (result === true || result?.ok) return;
-                        console.warn('Info sinkronisasi Firebase (data tetap tersimpan di browser):', result);
+                        toast('Gagal menyimpan ke Firebase. Perubahan ini hanya ada di perangkat ini; jangan tutup sebelum koneksi diperbaiki.', true); console.warn('Sinkronisasi Firebase gagal:', result);
                     }).catch(err => {
-                        console.warn('Info sinkronisasi Firebase (data tetap tersimpan di browser):', err);
+                        toast('Firebase tidak dapat dijangkau. Data belum dipastikan tersimpan di cloud.', true); console.warn('Sinkronisasi Firebase gagal:', err);
                     });
                 }
                 return true;
@@ -996,8 +1008,8 @@
                 localStorage.setItem(MASTER_STORAGE_KEY, JSON.stringify(payload));
                 if (window.SIMKENDIS_FIREBASE?.saveMasterSettings) {
                     window.SIMKENDIS_FIREBASE.saveMasterSettings(payload).then(result => {
-                        if (!result?.ok) console.warn('Sinkronisasi pengaturan master gagal:', result);
-                    }).catch(err => console.warn('Sinkronisasi pengaturan master gagal:', err));
+                        if (!result?.ok) { toast('Pengaturan master gagal tersimpan ke Firebase.', true); console.warn('Sinkronisasi pengaturan master gagal:', result); } else { window.dispatchEvent(new CustomEvent('simkendis-firebase-status',{detail:{ok:true,message:'Master data tersimpan di Firebase',detail:'Master data tersedia lintas perangkat.'}})); }
+                    }).catch(err => { toast('Pengaturan master belum tersimpan ke Firebase.', true); console.warn('Sinkronisasi pengaturan master gagal:', err); });
                 }
                 return true;
             }
@@ -1295,7 +1307,7 @@
               const r=await geminiExtract(src,'memo');
               if(r.nomor_ajuan || r.nomor_memo) $('no-memo').value=String(r.nomor_ajuan || r.nomor_memo).trim();
               const memoAmount = Number(r.nominal_pengalihan_bbm ?? r.nominal) || 0;
-              if(memoAmount>0) $('nominal-memo').value=Math.round(memoAmount);
+              if(memoAmount>0) $('nominal-memo').value=formatNominalDisplay(Math.round(memoAmount));
               const unit = String(r.unit_kerja || r.sumber || '').trim();
               if(unit) { const match=memoSources.find(x=>x.toLowerCase()===unit.toLowerCase()); if(match) $('memo-dari').value=match; window.__simkendisScannedMemoUnit=unit; }
               if(r.status && /cair|dibayar|terbayar/i.test(r.status)) $('status-memo').value='Sudah Cair';
@@ -1312,6 +1324,10 @@
               const r=await geminiExtract(src,'receipt');
               if(Number(r.nominal)>0) s.nominal=Math.round(Number(r.nominal));
               if(r.nomor_struk) s.noNota=String(r.nomor_struk).trim();
+              if(r.no_transaksi || r.nomor_transaksi || r.transaction_no) s.noTransaksi=String(r.no_transaksi||r.nomor_transaksi||r.transaction_no).trim();
+              if(r.tanggal || r.tanggal_transaksi || r.transaction_date) { const rawDate=String(r.tanggal_transaksi||r.transaction_date||r.tanggal).trim(); const iso=rawDate.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$/); const dmy=rawDate.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/); s.tanggalStruk=iso?`${iso[1]}-${iso[2].padStart(2,'0')}-${iso[3].padStart(2,'0')}`:dmy?`${dmy[3]}-${dmy[2].padStart(2,'0')}-${dmy[1].padStart(2,'0')}`:s.tanggalStruk||''; }
+              if(r.volume_liter ?? r.volume ?? r.liter) s.volumeLiter=String(r.volume_liter??r.volume??r.liter).replace(/[^0-9,.]/g,'');
+              if(r.plat_nomor || r.platNomor || r.plate_number) s.platNomor=String(r.plat_nomor||r.platNomor||r.plate_number).trim().toUpperCase();
               s.scanConfidence=r.confidence||''; s.scanNotes=r.catatan||'';
               renderFormStrukItems();
               if($('status-struk').value==='Belum Ada') $('status-struk').value='Proses SPJ';
@@ -1330,6 +1346,113 @@
                 reader.readAsDataURL(file);
             });
         }
+        // OpenCV.js dipakai untuk mendeteksi tepi dokumen, memotong latar, dan meluruskan perspektif.
+        let openCvLoadPromise = null;
+        function loadOpenCV() {
+            if (window.cv && window.cv.Mat) return Promise.resolve(window.cv);
+            if (openCvLoadPromise) return openCvLoadPromise;
+            openCvLoadPromise = new Promise((resolve, reject) => {
+                const existing = document.querySelector('script[data-simkendis-opencv]');
+                const script = existing || document.createElement('script');
+                let settled = false;
+                const timer = setTimeout(() => { if (!settled) { settled = true; reject(new Error('Pustaka scanner belum termuat. Periksa internet lalu coba unggah ulang.')); } }, 25000);
+                const finish = () => {
+                    if (settled) return;
+                    if (window.cv && window.cv.Mat) { settled = true; clearTimeout(timer); resolve(window.cv); }
+                };
+                script.dataset.simkendisOpencv = '1';
+                script.src = script.src || 'https://docs.opencv.org/4.x/opencv.js';
+                script.async = true;
+                script.onload = () => {
+                    const pollStart = Date.now();
+                    const poll = () => {
+                        if (window.cv && window.cv.Mat) { finish(); return; }
+                        if (Date.now() - pollStart > 24000) { if (!settled) { settled = true; clearTimeout(timer); reject(new Error('OpenCV gagal diinisialisasi.')); } return; }
+                        setTimeout(poll, 150);
+                    };
+                    poll();
+                };
+                script.onerror = () => { if (!settled) { settled = true; clearTimeout(timer); reject(new Error('Pustaka scanner tidak dapat diunduh.')); } };
+                if (!existing) document.head.appendChild(script);
+                else if (window.cv && window.cv.Mat) finish();
+            });
+            return openCvLoadPromise;
+        }
+        function orderDocumentCorners(points) {
+            const sum = points.map(p => p.x + p.y), diff = points.map(p => p.y - p.x);
+            return [points[sum.indexOf(Math.min(...sum))], points[diff.indexOf(Math.min(...diff))], points[sum.indexOf(Math.max(...sum))], points[diff.indexOf(Math.max(...diff))]]; // TL, TR, BR, BL
+        }
+        async function perspectiveCropDocument(img, canvas) {
+            const cvlib = await loadOpenCV();
+            let src, gray, blurred, edges, contours, hierarchy, kernel, best = null;
+            try {
+                src = cvlib.imread(img);
+                const scale = Math.min(1, 1000 / Math.max(src.cols, src.rows));
+                let work = src;
+                if (scale < 1) { work = new cvlib.Mat(); cvlib.resize(src, work, new cvlib.Size(Math.round(src.cols*scale), Math.round(src.rows*scale))); }
+                gray = new cvlib.Mat(); blurred = new cvlib.Mat(); edges = new cvlib.Mat(); contours = new cvlib.MatVector(); hierarchy = new cvlib.Mat();
+                cvlib.cvtColor(work, gray, cvlib.COLOR_RGBA2GRAY);
+                cvlib.GaussianBlur(gray, blurred, new cvlib.Size(5,5), 0);
+                cvlib.Canny(blurred, edges, 45, 135);
+                kernel = cvlib.getStructuringElement(cvlib.MORPH_RECT, new cvlib.Size(5,5));
+                cvlib.dilate(edges, edges, kernel);
+                cvlib.findContours(edges, contours, hierarchy, cvlib.RETR_LIST, cvlib.CHAIN_APPROX_SIMPLE);
+                let bestArea = 0; const imageArea = work.cols * work.rows;
+                for (let i=0; i<contours.size(); i++) {
+                    const contour = contours.get(i), peri = cvlib.arcLength(contour, true), approx = new cvlib.Mat();
+                    cvlib.approxPolyDP(contour, approx, 0.02*peri, true);
+                    const area = Math.abs(cvlib.contourArea(contour));
+                    if (approx.rows === 4 && area > imageArea*0.12 && area > bestArea && cvlib.isContourConvex(approx)) {
+                        const pts=[]; for(let j=0;j<4;j++) pts.push({x:approx.intAt(j,0),y:approx.intAt(j,1)});
+                        const ordered=orderDocumentCorners(pts);
+                        const minSide=Math.min(...ordered.map((pt,j)=>{const next=ordered[(j+1)%4];return Math.hypot(next.x-pt.x,next.y-pt.y)}));
+                        if(minSide>Math.min(work.cols,work.rows)*0.12){best=ordered;bestArea=area;}
+                    }
+                    contour.delete(); approx.delete();
+                }
+                if (!best) { if(work!==src) work.delete(); return false; }
+                // Ubah koordinat dari gambar kerja ke gambar sumber.
+                best = best.map(p=>({x:p.x/scale,y:p.y/scale}));
+                const [tl,tr,br,bl]=best;
+                const width=Math.round(Math.max(Math.hypot(br.x-bl.x,br.y-bl.y),Math.hypot(tr.x-tl.x,tr.y-tl.y)));
+                const height=Math.round(Math.max(Math.hypot(tr.x-br.x,tr.y-br.y),Math.hypot(tl.x-bl.x,tl.y-bl.y)));
+                if(width<120 || height<160 || width>5000 || height>7000) { if(work!==src) work.delete(); return false; }
+                const srcPts=cvlib.matFromArray(4,1,cvlib.CV_32FC2,[tl.x,tl.y,tr.x,tr.y,br.x,br.y,bl.x,bl.y]);
+                const dstPts=cvlib.matFromArray(4,1,cvlib.CV_32FC2,[0,0,width-1,0,width-1,height-1,0,height-1]);
+                const transform=cvlib.getPerspectiveTransform(srcPts,dstPts), output=new cvlib.Mat();
+                cvlib.warpPerspective(src,output,transform,new cvlib.Size(width,height),cvlib.INTER_CUBIC,cvlib.BORDER_REPLICATE,new cvlib.Scalar());
+                canvas.width=Math.min(2200,Math.round(width*Math.min(1,2200/Math.max(width,height))));
+                canvas.height=Math.max(1,Math.round(height*canvas.width/width));
+                cvlib.imshow(canvas,output);
+                srcPts.delete();dstPts.delete();transform.delete();output.delete();if(work!==src)work.delete();
+                return true;
+            } finally {
+                [src,gray,blurred,edges,contours,hierarchy,kernel].forEach(m=>{try{if(m)m.delete()}catch(_){}});
+            }
+        }
+        async function makeScannedImage(file) {
+            if (!file || !/^image\/(jpeg|png|webp)$/i.test(file.type)) return { file, dataUrl: await readFileAsDataUrl(file), scanned: false, perspectiveCorrected: false };
+            const originalUrl = await readFileAsDataUrl(file);
+            const img = await new Promise((resolve, reject) => { const im=new Image(); im.onload=()=>resolve(im); im.onerror=()=>reject(new Error('Foto tidak dapat dibaca untuk diproses.')); im.src=originalUrl; });
+            const maxSide=2200, scale=Math.min(1,maxSide/Math.max(img.naturalWidth,img.naturalHeight));
+            const canvas=document.createElement('canvas');
+            canvas.width=Math.max(1,Math.round(img.naturalWidth*scale)); canvas.height=Math.max(1,Math.round(img.naturalHeight*scale));
+            const ctx=canvas.getContext('2d',{willReadFrequently:true}); ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.drawImage(img,0,0,canvas.width,canvas.height);
+            let perspectiveCorrected=false;
+            try { perspectiveCorrected = await perspectiveCropDocument(img, canvas); }
+            catch(err) { console.warn('Koreksi perspektif otomatis dilewati:',err); }
+            const outCtx=canvas.getContext('2d',{willReadFrequently:true});
+            const frame=outCtx.getImageData(0,0,canvas.width,canvas.height),px=frame.data;
+            // Tingkatkan kontras setelah crop; pertahankan grayscale halus agar cetakan thermal tidak hilang.
+            for(let i=0;i<px.length;i+=4){const gray=.299*px[i]+.587*px[i+1]+.114*px[i+2];let v=(gray-128)*1.32+138;v=Math.max(0,Math.min(255,v));if(v>238)v=255;px[i]=px[i+1]=px[i+2]=v;px[i+3]=255;}
+            outCtx.putImageData(frame,0,0);
+            const scannedUrl=canvas.toDataURL('image/jpeg',.93), blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/jpeg',.93));
+            if(!blob)throw new Error('Gagal membuat hasil scan foto.');
+            const stem=(file.name||'nota').replace(/\.[^.]+$/,'');
+            const scannedFile=new File([blob],stem+'_hasil-scan.jpg',{type:'image/jpeg',lastModified:Date.now()});
+            return {file:scannedFile,dataUrl:scannedUrl,scanned:true,perspectiveCorrected};
+        }
+
         async function uploadToSimkendisDrive(file, category, dateValue, preReadDataUrl) {
             const dataUrl = preReadDataUrl || await readFileAsDataUrl(file);
             const yearMatch = String(dateValue || '').match(/(20\d{2})/);
@@ -1384,6 +1507,7 @@
                 const old = bookings.find(b => b.id === $('edit-id').value);
                 if (old) { old.memoDataUrl = null; if (!persistBookings()) return; renderTable(); renderRealisasi(); }
                 $('label-file-memo').textContent = 'Unggah Scan/Foto Memo Perencanaan';
+                updateMemoAttachmentPreview(null);
                 const input = $('file-memo'); if (input) input.value = '';
                 toast(fileId ? 'Lampiran memo dihapus dari Drive dan data peminjaman.' : 'Lampiran memo dihapus dari data peminjaman. File Drive lama tanpa ID mungkin perlu dihapus manual.');
             } catch (err) { toast('Penghapusan gagal: ' + (err.message || err), true); }
@@ -1410,13 +1534,16 @@
             if(!/^image\/(jpeg|png|webp|gif)$/i.test(file.type) && !/\.pdf$/i.test(file.name)) { input.value=''; return toast('Gunakan file JPG, PNG, WEBP, atau PDF.',true); }
             const label=$(labelId); if(label) label.textContent='Mengunggah ke Drive…';
             try {
-                const localDataUrl = await readFileAsDataUrl(file);
+                const processed = await makeScannedImage(file);
+                const uploadFile = processed.file;
+                const localDataUrl = processed.dataUrl;
                 tempUploads.memoLocalDataUrl = localDataUrl;
                 const category = target.toLowerCase().includes('memo') ? 'memo' : 'nota-bbm';
-                const result = await uploadToSimkendisDrive(file, category, $('tanggal')?.value || '', localDataUrl);
-                tempUploads[target] = {driveUrl:result.url, fileId:result.fileId||'', fileName:file.name, mimeType:file.type||'', folderPath:result.folderPath||''};
-                if(label) label.textContent='Tersimpan di Drive: '+file.name;
-                toast('Lampiran tersimpan di Drive ('+result.folderPath+').');
+                const result = await uploadToSimkendisDrive(uploadFile, category, $('tanggal')?.value || '', localDataUrl);
+                tempUploads[target] = {driveUrl:result.url, fileId:result.fileId||'', fileName:uploadFile.name, mimeType:uploadFile.type||'', folderPath:result.folderPath||'', scanned:processed.scanned};
+                if (target === 'memoDataUrl') updateMemoAttachmentPreview(result.url);
+                if(label) label.textContent=(processed.scanned?'Hasil scan tersimpan di Drive: ':'Tersimpan di Drive: ')+uploadFile.name;
+                toast((processed.perspectiveCorrected ? 'Dokumen dipotong dan diluruskan; hasil scan tersimpan di Drive. ' : (processed.scanned ? 'Hasil scan tersimpan di Drive; sudut tidak terdeteksi, crop otomatis dilewati. ' : 'Lampiran tersimpan di Drive. ')) + '(' + result.folderPath + ').');
             } catch(err) {
                 console.warn(err);
                 if(label) label.textContent='Tersimpan lokal: '+file.name;
@@ -1424,12 +1551,54 @@
             }
         }
 
-        function addFormStrukItem() { formStrukList.push({id:uid('S'),nominal:'',noNota:'',dataUrl:null,fileName:''}); renderFormStrukItems(); }
+        function addFormStrukItem() { formStrukList.push({id:uid('S'),nominal:'',noNota:'',noTransaksi:'',tanggalStruk:'',volumeLiter:'',platNomor:'',dataUrl:null,fileName:''}); renderFormStrukItems(); }
         function removeFormStrukItem(id) { if(formStrukList.length<=1) return toast('Minimal satu baris struk.',true); formStrukList=formStrukList.filter(s=>s.id!==id); renderFormStrukItems(); }
+        function drivePreviewUrl(value) {
+            const id = extractDriveFileId(value);
+            return id ? `https://drive.google.com/file/d/${encodeURIComponent(id)}/preview` : '';
+        }
+        function attachmentPreviewMarkup(value, name='Lampiran', portrait=false) {
+            if (!value) return '';
+            const url = typeof value === 'string' ? value : (value.driveUrl || value.url || value.webViewLink || '');
+            if (!url) return '';
+            const preview = drivePreviewUrl(url);
+            if (preview) return `<div class="mt-2 rounded-lg border border-slate-200 bg-slate-50 p-2"><div class="text-[11px] font-semibold text-slate-600 mb-1">Pratinjau ${esc(name)}</div><iframe src="${esc(preview)}" title="Pratinjau ${esc(name)}" loading="lazy" class="w-full rounded-md border bg-white" style="height:${portrait?'min(68vh,560px)':'280px'};min-height:${portrait?'420px':'280px'};aspect-ratio:${portrait?'3/4':'auto'}" allow="autoplay"></iframe><a href="${esc(url)}" target="_blank" rel="noopener" class="text-xs text-sky-700 underline block mt-1">Buka file penuh di Google Drive</a></div>`;
+            if (/^data:image\//i.test(url) || /\.(png|jpe?g|gif|webp)(\?|#|$)/i.test(url)) return `<div class="mt-2 rounded-lg border border-slate-200 bg-slate-50 p-2"><div class="text-[11px] font-semibold text-slate-600 mb-1">Pratinjau ${esc(name)}</div><img src="${esc(url)}" alt="${esc(name)}" class="${portrait?'w-full':'max-w-full'} mx-auto object-contain rounded-md" style="${portrait?'max-height:min(68vh,560px);aspect-ratio:3/4;object-fit:contain':'max-height:20rem'}"/><a href="${esc(url)}" target="_blank" rel="noopener" class="text-xs text-sky-700 underline block mt-1">Buka file penuh</a></div>`;
+            return `<div class="mt-2 rounded-lg border border-slate-200 bg-slate-50 p-2"><div class="text-[11px] font-semibold text-slate-600 mb-1">${esc(name)} tersimpan</div><a href="${esc(url)}" target="_blank" rel="noopener" class="text-xs text-sky-700 underline">Buka lampiran untuk memeriksa</a></div>`;
+        }
+        function updateMemoAttachmentPreview(value) {
+            const host = $('memo-preview-host');
+            if (host) host.innerHTML = attachmentPreviewMarkup(value, 'Memo BBM');
+        }
         function renderFormStrukItems() {
-            $('struk-items-container').innerHTML=formStrukList.map((s,i)=>`<div class="rounded-lg border border-slate-200 bg-white p-2.5 space-y-2"><div class="flex items-center justify-between"><b class="text-xs">Struk ${i+1}</b><button type="button" onclick="removeFormStrukItem('${s.id}')" class="text-rose-600 text-xs" ${formStrukList.length===1?'disabled':''}>Hapus</button></div><div class="grid grid-cols-1 sm:grid-cols-2 gap-2"><input type="number" min="0" step="1" value="${esc(s.nominal)}" placeholder="Nominal Rp (angka rupiah tepat)" oninput="updateStruk('${s.id}','nominal',this.value)" class="w-full px-2 py-1.5 border rounded-lg text-xs"><input value="${esc(s.noNota)}" placeholder="Nomor nota / SPBU" oninput="updateStruk('${s.id}','noNota',this.value)" class="w-full px-2 py-1.5 border rounded-lg text-xs"></div><label class="text-xs text-slate-500">Foto/PDF struk (opsional)<input type="file" accept="image/*,application/pdf" onchange="uploadStruk(this,'${s.id}')" class="block mt-1 w-full text-xs"></label><button type="button" onclick="scanReceiptWithGemini('${s.id}')" class="w-full px-3 py-2 rounded-lg bg-violet-100 hover:bg-violet-200 text-violet-900 text-xs font-bold border border-violet-200"><i class="fa-solid fa-wand-magic-sparkles mr-1"></i> Scan Nominal & Nomor Struk dengan AI</button>${(s.fileName||s.driveUrl)?`<span class="text-emerald-700 text-xs block truncate">${esc(s.fileName||'Lampiran dari Telegram')} ${s.driveUrl?'(Drive)':''}</span>${s.driveUrl?`<a href="${esc(s.driveUrl)}" target="_blank" rel="noopener" class="text-sky-700 text-xs underline block">Buka lampiran tersimpan</a>`:''}<button type="button" onclick="deleteReceiptAttachment('${s.id}')" class="w-full px-2 py-1.5 rounded-lg border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold"><i class="fa-solid fa-trash-can mr-1"></i> Hapus lampiran struk</button>`:''}</div>`).join('');
+            $('struk-items-container').innerHTML=formStrukList.map((s,i)=>`<div class="rounded-lg border border-slate-200 bg-white p-2.5 space-y-2"><div class="flex items-center justify-between"><b class="text-xs">Struk ${i+1}</b><button type="button" onclick="removeFormStrukItem('${s.id}')" class="text-rose-600 text-xs" ${formStrukList.length===1?'disabled':''}>Hapus</button></div><div class="grid grid-cols-1 lg:grid-cols-2 gap-3 items-start"><div class="min-w-0 space-y-2"><div class="grid grid-cols-1 sm:grid-cols-2 gap-2"><input type="text" inputmode="numeric" autocomplete="off" value="${esc(formatNominalDisplay(s.nominal))}" placeholder="Total nominal Rp" oninput="formatStrukNominal(this,'${s.id}')" class="w-full px-2 py-1.5 border rounded-lg text-xs"><input value="${esc(s.noNota||'')}" placeholder="Nomor struk / SPBU" oninput="updateStruk('${s.id}','noNota',this.value)" class="w-full px-2 py-1.5 border rounded-lg text-xs"></div><div class="rounded-lg border border-sky-100 bg-sky-50 p-2 space-y-2"><div class="text-[11px] font-bold text-sky-900">Detail struk (koreksi manual bila hasil scan salah)</div><div class="grid grid-cols-1 sm:grid-cols-2 gap-2"><input value="${esc(s.noTransaksi||s.nomorTransaksi||'')}" placeholder="No. transaksi" aria-label="Nomor transaksi struk ${i+1}" oninput="updateStruk('${s.id}','noTransaksi',this.value)" class="w-full px-2 py-1.5 border rounded-lg text-xs"><input type="date" value="${esc(s.tanggalStruk||s.tanggal||'')}" aria-label="Tanggal struk ${i+1}" oninput="updateStruk('${s.id}','tanggalStruk',this.value)" class="w-full px-2 py-1.5 border rounded-lg text-xs"><input type="text" inputmode="decimal" value="${esc(s.volumeLiter??'')}" placeholder="Volume (liter), mis. 35,5" aria-label="Volume liter struk ${i+1}" oninput="updateStruk('${s.id}','volumeLiter',this.value)" class="w-full px-2 py-1.5 border rounded-lg text-xs"><input value="${esc(s.platNomor||s.plat_nomor||'')}" placeholder="Plat nomor (jika ada)" aria-label="Plat nomor struk ${i+1}" oninput="updateStruk('${s.id}','platNomor',this.value.toUpperCase())" class="w-full px-2 py-1.5 border rounded-lg text-xs"></div></div><label class="text-xs text-slate-500">Foto/PDF struk (opsional)<input type="file" accept="image/*,application/pdf" onchange="uploadStruk(this,'${s.id}')" class="block mt-1 w-full text-xs"></label><button type="button" onclick="scanReceiptWithGemini('${s.id}')" class="w-full px-3 py-2 rounded-lg bg-violet-100 hover:bg-violet-200 text-violet-900 text-xs font-bold border border-violet-200"><i class="fa-solid fa-wand-magic-sparkles mr-1"></i> Scan Nominal & Nomor Struk dengan AI</button>${(s.fileName||s.driveUrl)?`<span class="text-emerald-700 text-xs block truncate">${esc(s.fileName||'Lampiran dari Telegram')} ${s.driveUrl?'(Drive)':''}</span>${s.driveUrl?`<a href="${esc(s.driveUrl)}" target="_blank" rel="noopener" class="text-sky-700 text-xs underline block">Buka lampiran tersimpan</a>`:''}<button type="button" onclick="deleteReceiptAttachment('${s.id}')" class="w-full px-2 py-1.5 rounded-lg border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold"><i class="fa-solid fa-trash-can mr-1"></i> Hapus lampiran struk</button>`:''}</div><div class="min-w-0">${s.driveUrl?attachmentPreviewMarkup(s.driveUrl,s.fileName||'Struk BBM',true):s.localDataUrl?attachmentPreviewMarkup(s.localDataUrl,s.fileName||'Struk BBM',true):`<div class="h-48 lg:min-h-[420px] rounded-lg border border-dashed border-slate-300 bg-slate-50 flex items-center justify-center text-xs text-slate-400 text-center p-4">Pratinjau nota BBM akan tampil di sini setelah diunggah</div>`}</div></div></div>`).join('');
             $('count-form-struk').textContent=formStrukList.length; updateStrukTotals();
         }
+        // Format nominal rupiah saat mengetik: tampilan 1.500.000, nilai tersimpan tetap angka 1500000.
+        function parseNominalID(value) {
+            if (typeof value === 'number') return Number.isFinite(value) ? Math.max(0, Math.round(value)) : 0;
+            const digits = String(value ?? '').replace(/[^0-9]/g, '');
+            return digits ? Number(digits) : 0;
+        }
+        function formatNominalDisplay(value) {
+            const n = parseNominalID(value);
+            return n.toLocaleString('id-ID');
+        }
+        function formatNominalField(input) {
+            const start = input.selectionStart ?? input.value.length;
+            const old = input.value;
+            const digitsBefore = old.slice(0, start).replace(/[^0-9]/g, '').length;
+            const digits = old.replace(/[^0-9]/g, '');
+            input.value = digits ? Number(digits).toLocaleString('id-ID') : '';
+            let pos = 0, seen = 0;
+            while (pos < input.value.length && seen < digitsBefore) { if (/\d/.test(input.value[pos])) seen++; pos++; }
+            try { input.setSelectionRange(pos, pos); } catch (_) {}
+        }
+        function formatStrukNominal(input, id) {
+            formatNominalField(input);
+            updateStruk(id, 'nominal', parseNominalID(input.value));
+        }
+
         function updateStruk(id,key,value) { const s=formStrukList.find(x=>x.id===id); if(s){s[key]=key==='nominal'?(value===''?'':Math.max(0,Number(value)||0)):value;updateStrukTotals();} }
 
         async function uploadStruk(input,id) {
@@ -1439,12 +1608,14 @@
             const item=formStrukList.find(x=>x.id===id); if(!item)return;
             item.fileName=f.name; item.uploading=true; renderFormStrukItems();
             try {
-                const localDataUrl = await readFileAsDataUrl(f);
+                const processed = await makeScannedImage(f);
+                const uploadFile = processed.file;
+                const localDataUrl = processed.dataUrl;
                 item.localDataUrl = localDataUrl;
-                const result=await uploadToSimkendisDrive(f,'nota-bbm',$('tanggal')?.value||'', localDataUrl);
-                item.driveUrl=result.url; item.driveFileId=result.fileId||''; item.folderPath=result.folderPath||''; item.dataUrl=null; item.uploading=false;
+                const result=await uploadToSimkendisDrive(uploadFile,'nota-bbm',$('tanggal')?.value||'', localDataUrl);
+                item.driveUrl=result.url; item.driveFileId=result.fileId||''; item.folderPath=result.folderPath||''; item.dataUrl=null; item.fileName=uploadFile.name; item.scanned=processed.scanned; item.uploading=false;
                 renderFormStrukItems();
-                toast('Nota BBM tersimpan di Drive.');
+                toast(processed.scanned?'Hasil scan nota BBM tersimpan di Drive.':'Nota BBM tersimpan di Drive.');
             } catch(err) {
                 item.uploading=false; renderFormStrukItems(); console.warn(err);
                 toast('Upload Drive gagal, file tetap bisa di-scan AI: '+(err.message||''),true);
@@ -1468,6 +1639,10 @@
                 id: s.id || uid('S'),
                 nominal: Number(s.nominal)||0,
                 noNota: String(s.noNota||'').trim(),
+                noTransaksi: String(s.noTransaksi||s.nomorTransaksi||'').trim(),
+                tanggalStruk: String(s.tanggalStruk||s.tanggal||'').trim(),
+                volumeLiter: String(s.volumeLiter??'').trim(),
+                platNomor: String(s.platNomor||s.plat_nomor||'').trim().toUpperCase(),
                 fileName: String(s.fileName||''),
                 driveUrl: s.driveUrl || null,
                 driveFileId: s.driveFileId || '',
@@ -1498,10 +1673,10 @@
                 strukList,
                 realisasiStruk:strukList.reduce((sum,s)=>sum+s.nominal,0),
                 noStruk:strukList.map(s=>s.noNota).filter(Boolean).join(', '),
-                statusMemo:((tempUploads.memoDataUrl || old?.memoDataUrl || old?.memoUrl || old?.memoURL || old?.memoDriveUrl || old?.memoFile?.url || old?.memoFile?.driveUrl || old?.memoWebViewLink || old?.memoDownloadUrl || old?.documents?.memo?.url) && (Number($('nominal-memo').value)||0)>0) ? 'Sudah Cair' : $('status-memo').value,
+                statusMemo:((tempUploads.memoDataUrl || old?.memoDataUrl || old?.memoUrl || old?.memoURL || old?.memoDriveUrl || old?.memoFile?.url || old?.memoFile?.driveUrl || old?.memoWebViewLink || old?.memoDownloadUrl || old?.documents?.memo?.url) && parseNominalID($('nominal-memo').value)>0) ? 'Sudah Cair' : $('status-memo').value,
                 memoDari:$('memo-dari').value||'Perencanaan',
                 memoUnitKerja:window.__simkendisScannedMemoUnit||old?.memoUnitKerja||'',
-                nominalMemo:Math.max(0,Number($('nominal-memo').value)||0),
+                nominalMemo:parseNominalID($('nominal-memo').value),
                 noMemo:$('no-memo').value.trim(),
                 memoDataUrl:tempUploads.memoDataUrl??old?.memoDataUrl??null,
                 bpuStatus:old?.bpuStatus||'Belum Dikirim',
@@ -1530,7 +1705,7 @@
             $('btn-submit').querySelector('span').textContent='Simpan Data Peminjaman'; $('btn-cancel-edit').classList.add('hidden');
             $('tujuan-detail').value=''; $('tujuan-online-query').value=''; $('custom-tujuan-wrapper').classList.add('hidden');
             window.__simkendisCurrentDestination=null; $('pakai-etoll').checked=false; $('estimasi-etoll').value=0; $('estimasi-etoll').disabled=true;
-            $('label-file-memo').textContent='Unggah Scan/Foto Memo Perencanaan'; $('nominal-memo').value=0;
+            $('label-file-memo').textContent='Unggah Scan/Foto Memo Perencanaan'; $('nominal-memo').value='0';
             tempUploads={memoDataUrl:null, memoLocalDataUrl:null};
             formStrukList=[{id:uid('S'),nominal:'',noNota:'',dataUrl:null,fileName:''}];
             $('tanggal').value=new Date().toLocaleDateString('en-CA');
@@ -1541,6 +1716,7 @@
 
         function editBooking(id) {
             const b=bookings.find(x=>x.id===id); if(!b)return;
+            if (b.isCompleted && !simkendisAdminMode) { toast('Jadwal sudah ditandai Selesai dan terkunci. Hubungi Admin untuk membuka kunci.', true); return; }
             $('edit-id').value=b.id;
             $('tanggal').value=b.tanggal||'';
             $('tanggal-selesai').value=b.tanggalSelesai||b.tanggal||'';
@@ -1563,7 +1739,7 @@
             $('status-struk').value=b.statusStruk||'Belum Ada';
             $('status-memo').value=memoIsEffectivelyPaid(b)?'Sudah Cair':(b.statusMemo||'Belum Diajukan');
             $('memo-dari').value=memoSources.includes(b.memoDari)?b.memoDari:(memoSources.includes(b.memoUnitKerja)?b.memoUnitKerja:(memoSources[0]||'Perencanaan'));
-            $('nominal-memo').value=Number(b.nominalMemo ?? b.nominal_pengalihan_bbm)||0;
+            $('nominal-memo').value=formatNominalDisplay(b.nominalMemo ?? b.nominal_pengalihan_bbm ?? 0);
             $('no-memo').value=b.noMemo||b.nomor_ajuan||'';
             tempUploads={memoDataUrl:b.memoDataUrl||b.memoUrl||b.memoURL||b.memoDriveUrl||b.memoFile?.url||b.memoFile?.driveUrl||null, memoLocalDataUrl:null};
             $('label-file-memo').textContent=tempUploads.memoDataUrl?'Memo sudah tersimpan (Web/Telegram/Drive)':'Unggah Scan/Foto Memo Perencanaan';
@@ -1577,6 +1753,7 @@
                     memoLinkHost.appendChild(link);
                 }
             }
+            updateMemoAttachmentPreview(tempUploads.memoDataUrl);
             const remoteStrukList = Array.isArray(b.strukList) ? b.strukList : (b.strukList && typeof b.strukList==='object' ? Object.values(b.strukList) : []);
             formStrukList=remoteStrukList.length
                 ? remoteStrukList.map((x,i)=>({
@@ -1584,6 +1761,10 @@
                     id: x.id || x.fileUniqueId || x.fileId || ('S-TELEGRAM-'+i),
                     nominal: x.nominal ?? '',
                     noNota: x.noNota || x.nomor_struk || '',
+                    noTransaksi: x.noTransaksi || x.nomorTransaksi || x.no_transaksi || x.transactionNo || '',
+                    tanggalStruk: x.tanggalStruk || x.tanggal || x.transactionDate || '',
+                    volumeLiter: x.volumeLiter ?? x.volume ?? x.liter ?? '',
+                    platNomor: x.platNomor || x.plat_nomor || '',
                     fileName: x.fileName || x.name || '',
                     driveUrl: x.driveUrl || x.url || x.webViewLink || null,
                     driveFileId: x.driveFileId || x.fileId || '',
@@ -1591,7 +1772,7 @@
                     dataUrl: x.dataUrl || null,
                     localDataUrl: null
                 }))
-                : [{id:uid('S'),nominal:b.realisasiStruk||'',noNota:b.noStruk||'',dataUrl:b.strukDataUrl||null,driveUrl:b.strukUrl||b.strukDriveUrl||null,driveFileId:b.strukFileId||'',fileName:b.strukFileName||''}];
+                : [{id:uid('S'),nominal:b.realisasiStruk||'',noNota:b.noStruk||'',noTransaksi:b.noTransaksiStruk||'',tanggalStruk:b.tanggalStruk||'',volumeLiter:b.volumeStrukLiter||'',platNomor:b.strukPlatNomor||'',dataUrl:b.strukDataUrl||null,driveUrl:b.strukUrl||b.strukDriveUrl||null,driveFileId:b.strukFileId||'',fileName:b.strukFileName||''}];
             $('form-title').textContent='Edit Data Peminjaman';
             $('btn-submit').querySelector('span').textContent='Simpan Perubahan';
             $('btn-cancel-edit').classList.remove('hidden');
@@ -1601,9 +1782,24 @@
 
         function deleteBooking(id) {
             const b=bookings.find(x=>x.id===id); if(!b) return;
+            if (b.isCompleted && !simkendisAdminMode) { toast('Jadwal Selesai terkunci dan tidak dapat dihapus. Admin harus membuka kunci terlebih dahulu.', true); return; }
             bookings=bookings.filter(x=>x.id!==id);
             persistBookings(); renderTable(); renderRealisasi();
             toast(`Data peminjaman ${b.peminjam} dihapus.`);
+        }
+
+        function setBookingCompleted(id, completed) {
+            const b = bookings.find(x => x.id === id); if (!b) return;
+            if (b.isCompleted && !completed && !simkendisAdminMode) {
+                toast('Hanya Admin yang dapat membatalkan status Selesai.', true); return;
+            }
+            if (completed && !b.isCompleted && !confirm('Tandai jadwal ini SELESAI? Setelah itu tombol Edit dan Hapus dikunci.')) return;
+            if (!completed && b.isCompleted && !confirm('Buka kunci jadwal ini? Tindakan ini hanya boleh dilakukan Admin.')) return;
+            b.isCompleted = !!completed;
+            b.completedAt = completed ? new Date().toISOString() : null;
+            b.completedBy = completed ? (simkendisAdminMode ? 'admin' : 'user') : null;
+            persistBookings(); renderTable();
+            toast(completed ? 'Jadwal ditandai Selesai dan dikunci.' : 'Kunci jadwal dibuka oleh Admin.');
         }
 
         function switchTab(tab) {
@@ -1682,12 +1878,34 @@
             b.bpuStatus=status; persistBookings(); renderTable(); toast('Status BPU diperbarui.');
         }
 
+        function resetMemoSourceFilter() { currentMemoSourceFilter = 'ALL'; renderTable(); }
+
+        function renderMemoSourceTabs() {
+            const host = $('memo-source-tab-buttons'); if (!host) return;
+            const sourceOf = b => String(b.memoDari || b.memoUnitKerja || '').trim() || 'Belum Ditentukan';
+            const sources = [...new Set([
+                ...memoSources.map(x => String(x || '').trim()).filter(Boolean),
+                ...bookings.map(sourceOf)
+            ])].sort((a,b)=>a.localeCompare(b,'id',{sensitivity:'base'}));
+            if (currentMemoSourceFilter !== 'ALL' && !sources.includes(currentMemoSourceFilter)) currentMemoSourceFilter = 'ALL';
+            const counts = source => bookings.filter(b => (currentTab === 'bpu' ? b.bpuStatus === 'Terkirim ke BPU' : b.bpuStatus !== 'Terkirim ke BPU') && (source === 'ALL' || sourceOf(b) === source)).length;
+            const items = [{value:'ALL',label:'Semua Sumber'} , ...sources.map(x=>({value:x,label:x}))];
+            host.innerHTML = items.map(item => {
+                const active = currentMemoSourceFilter === item.value;
+                return `<button type="button" onclick="selectMemoSourceFilter(decodeURIComponent('${encodeURIComponent(item.value)}'))" class="px-3 py-2 rounded-xl border text-xs font-bold transition ${active?'bg-uns-blue text-white border-uns-blue shadow-sm':'bg-slate-50 text-slate-700 border-slate-200 hover:bg-blue-50'}">${esc(item.label)} <span class="ml-1 ${active?'bg-white/20':'bg-slate-200'} rounded-full px-1.5 py-0.5 text-[10px]">${counts(item.value)}</span></button>`;
+            }).join('');
+        }
+
+        function selectMemoSourceFilter(source) { currentMemoSourceFilter = source; renderTable(); }
+
         function renderTable() {
+            renderMemoSourceTabs();
             const q=($('search-input')?.value||'').trim().toLowerCase(), fm=$('filter-memo')?.value||'ALL', fs=$('filter-struk')?.value||'ALL';
             const sortBy=$('sort-bookings')?.value||'date-desc';
             const filtered=bookings.filter(b=>{
                 const matches=[b.peminjam,b.kendaraan,b.driver,b.tujuanNama,b.noMemo,b.noStruk,b.tanggal].some(v=>String(v||'').toLowerCase().includes(q));
-                return matches&&(fm==='ALL'||(memoIsEffectivelyPaid(b)?'Sudah Cair':(b.statusMemo||'Belum Diajukan'))===fm)&&(fs==='ALL'||(b.statusStruk||'Belum Ada')===fs)&&(currentTab==='bpu'?b.bpuStatus==='Terkirim ke BPU':b.bpuStatus!=='Terkirim ke BPU');
+                const source = String(b.memoDari || b.memoUnitKerja || '').trim() || 'Belum Ditentukan';
+                return matches&&(currentMemoSourceFilter==='ALL'||source===currentMemoSourceFilter)&&(fm==='ALL'||(memoIsEffectivelyPaid(b)?'Sudah Cair':(b.statusMemo||'Belum Diajukan'))===fm)&&(fs==='ALL'||(b.statusStruk||'Belum Ada')===fs)&&(currentTab==='bpu'?b.bpuStatus==='Terkirim ke BPU':b.bpuStatus!=='Terkirim ke BPU');
             });
             const dateValue=b=>String(b.tanggal||'');
             filtered.sort((a,b)=>{
@@ -1704,8 +1922,8 @@
                 const receiptRows = (Array.isArray(b.strukList)?b.strukList:[]).filter(x=>x && (x.dataUrl||x.driveUrl||x.url||x.webViewLink||Number(x.nominal)>0||x.noNota||x.platNomor));
                 const hasStrukDoc = receiptRows.some(x=>x.dataUrl||x.driveUrl||x.url||x.webViewLink);
                 const hasMemoDoc = Boolean(b.memoDataUrl || b.memoUrl || b.memoURL || b.memoDriveUrl || b.memoFile?.url || b.memoFile?.driveUrl || b.documents?.memo?.url);
-                const receiptDetails = receiptRows.map((x,i)=>`<div class="mt-1 border-t border-slate-100 pt-1 text-[10px] leading-snug"><b>Struk ${i+1}</b><div>No: ${esc(x.noNota||x.nomor_struk||'Belum terbaca')}</div><div>Rp ${Number(x.nominal||0).toLocaleString('id-ID')}</div><div>Plat: ${esc(x.platNomor||x.plat_nomor||b.strukPlatNomor||'Tidak tercantum')}</div>${(x.driveUrl||x.url||x.webViewLink)?`<a href="${esc(x.driveUrl||x.url||x.webViewLink)}" target="_blank" rel="noopener" class="text-uns-blue underline">Buka struk</a>`:''}</div>`).join('');
-                return `<tr class="align-top hover:bg-slate-50"><td class="p-3 text-center font-bold text-slate-500">${index+1}</td><td class="p-3 whitespace-nowrap"><div>${esc(b.tanggal||'-')}</div>${b.tanggalSelesai&&b.tanggalSelesai!==b.tanggal?`<div class="text-slate-500 text-[10px] mt-1">s.d. ${esc(b.tanggalSelesai)}</div><div class="text-blue-700 text-[10px]">${Math.max(1,Number(b.durasiHari)||1)} hari</div>`:''}</td><td class="p-3 min-w-36"><b>${esc(b.peminjam)}</b></td><td class="p-3 min-w-36">${esc(b.kendaraan)}<div class="text-slate-500 mt-1">${esc(b.driver)}</div></td><td class="p-3 min-w-32">${esc(b.tujuanNama||'-')}<div class="text-slate-500 mt-1">${Number(b.totalKm)||0} km</div></td><td class="p-3 whitespace-nowrap"><b>${rupiah(b.estimasiBiaya)}</b><div class="text-slate-500">${Number(b.estimasiLiter||0).toLocaleString('id-ID',{maximumFractionDigits:2})} L</div></td><td class="p-3 whitespace-nowrap">${b.pakaiEtoll?`<b>${rupiah(b.estimasiEtoll)}</b><div class="text-amber-700 text-[10px]">Pakai tol</div>`:'<span class="text-slate-400">Tidak pakai tol</span>'}</td><td class="p-3 min-w-36">${esc((receiptRows.some(x=>x.dataUrl||x.driveUrl||x.url||x.webViewLink) && (!b.statusStruk||b.statusStruk==='Belum Ada'||b.statusStruk==='Belum Ada Struk')) ? 'Terlampir' : (b.statusStruk||'Belum Ada'))}<div class="font-semibold text-slate-700">Total: ${rupiah(b.realisasiStruk || receiptRows.reduce((n,x)=>n+(Number(x.nominal)||0),0))}</div>${receiptDetails}${hasStrukDoc?`<button onclick="previewDocs('${b.id}','struk')" class="text-uns-blue underline mt-1">Lihat semua lampiran</button>`:''}</td><td class="p-3 min-w-28">${esc(memoIsEffectivelyPaid(b)?'Sudah Cair':(b.statusMemo||'Belum Diajukan'))}<div class="text-indigo-700">Dari: ${esc(b.memoDari||'Perencanaan')}</div><div class="font-semibold text-slate-800">Nominal: ${rupiah(b.nominalMemo||0)}</div><div class="text-slate-500">${esc(b.noMemo||'Tanpa nomor memo')}</div>${hasMemoDoc?`<button onclick="previewDocs('${b.id}','memo')" class="text-uns-blue underline mt-1">Lihat memo</button>`:''}</td><td class="p-3 no-print min-w-36"><div class="space-y-2"><select onchange="setBpu('${b.id}',this.value)" class="w-full border rounded px-2 py-1 text-xs"><option ${b.bpuStatus!=='Terkirim ke BPU'?'selected':''}>Belum Dikirim</option><option ${b.bpuStatus==='Terkirim ke BPU'?'selected':''}>Terkirim ke BPU</option></select><div class="flex gap-2"><button onclick="editBooking('${b.id}')" class="text-uns-blue font-semibold">Edit</button><button onclick="deleteBooking('${b.id}')" class="text-rose-600 font-semibold">Hapus</button></div></div></td></tr>`;
+                const receiptDetails = receiptRows.map((x,i)=>`<div class="mt-1 border-t border-slate-100 pt-1 text-[10px] leading-snug"><b>Struk ${i+1}</b><div>No. transaksi: ${esc(x.noTransaksi||x.nomorTransaksi||x.no_transaksi||'Belum terbaca')}</div><div>Tanggal: ${esc(x.tanggalStruk||x.tanggal||x.transactionDate||'Belum terbaca')}</div><div>Volume: ${esc(x.volumeLiter??x.volume??x.liter??'Belum terbaca')}${(x.volumeLiter??x.volume??x.liter)!==''&& (x.volumeLiter??x.volume??x.liter)!=null?' L':''}</div><div>Total: Rp ${Number(x.nominal||0).toLocaleString('id-ID')}</div><div>Plat: ${esc(x.platNomor||x.plat_nomor||b.strukPlatNomor||'Tidak tercantum')}</div>${(x.driveUrl||x.url||x.webViewLink)?`<a href="${esc(x.driveUrl||x.url||x.webViewLink)}" target="_blank" rel="noopener" class="text-uns-blue underline">Buka struk</a>`:''}</div>`).join('');
+                return `<tr class="align-top hover:bg-slate-50"><td class="p-3 text-center font-bold text-slate-500">${index+1}</td><td class="p-3 whitespace-nowrap"><div>${esc(b.tanggal||'-')}</div>${b.tanggalSelesai&&b.tanggalSelesai!==b.tanggal?`<div class="text-slate-500 text-[10px] mt-1">s.d. ${esc(b.tanggalSelesai)}</div><div class="text-blue-700 text-[10px]">${Math.max(1,Number(b.durasiHari)||1)} hari</div>`:''}</td><td class="p-3 min-w-36"><b>${esc(b.peminjam)}</b></td><td class="p-3 min-w-36">${esc(b.kendaraan)}<div class="text-slate-500 mt-1">${esc(b.driver)}</div></td><td class="p-3 min-w-32">${esc(b.tujuanNama||'-')}<div class="text-slate-500 mt-1">${Number(b.totalKm)||0} km</div></td><td class="p-3 whitespace-nowrap"><b>${rupiah(b.estimasiBiaya)}</b><div class="text-slate-500">${Number(b.estimasiLiter||0).toLocaleString('id-ID',{maximumFractionDigits:2})} L</div></td><td class="p-3 whitespace-nowrap">${b.pakaiEtoll?`<b>${rupiah(b.estimasiEtoll)}</b><div class="text-amber-700 text-[10px]">Pakai tol</div>`:'<span class="text-slate-400">Tidak pakai tol</span>'}</td><td class="p-3 min-w-36">${esc((receiptRows.some(x=>x.dataUrl||x.driveUrl||x.url||x.webViewLink) && (!b.statusStruk||b.statusStruk==='Belum Ada'||b.statusStruk==='Belum Ada Struk')) ? 'Terlampir' : (b.statusStruk||'Belum Ada'))}<div class="font-semibold text-slate-700">Total: ${rupiah(b.realisasiStruk || receiptRows.reduce((n,x)=>n+(Number(x.nominal)||0),0))}</div>${receiptDetails}${hasStrukDoc?`<button onclick="previewDocs('${b.id}','struk')" class="text-uns-blue underline mt-1">Lihat semua lampiran</button>`:''}</td><td class="p-3 min-w-28">${esc(memoIsEffectivelyPaid(b)?'Sudah Cair':(b.statusMemo||'Belum Diajukan'))}<div class="text-indigo-700">Dari: ${esc(b.memoDari||'Perencanaan')}</div><div class="font-semibold text-slate-800">Nominal: ${rupiah(b.nominalMemo||0)}</div><div class="text-slate-500">${esc(b.noMemo||'Tanpa nomor memo')}</div>${hasMemoDoc?`<button onclick="previewDocs('${b.id}','memo')" class="text-uns-blue underline mt-1">Lihat memo</button>`:''}</td><td class="p-3 no-print min-w-36"><div class="space-y-2"><select onchange="setBpu('${b.id}',this.value)" class="w-full border rounded px-2 py-1 text-xs" ${b.isCompleted?'disabled title="Jadwal terkunci"':''}><option ${b.bpuStatus!=='Terkirim ke BPU'?'selected':''}>Belum Dikirim</option><option ${b.bpuStatus==='Terkirim ke BPU'?'selected':''}>Terkirim ke BPU</option></select>${b.isCompleted?`<div class="text-emerald-700 text-xs font-bold">✓ SELESAI · TERKUNCI</div>${simkendisAdminMode?`<button onclick="setBookingCompleted('${b.id}',false)" class="w-full rounded bg-amber-100 text-amber-800 px-2 py-1.5 text-xs font-bold">Buka Kunci (Admin)</button>`:''}`:`<button onclick="setBookingCompleted('${b.id}',true)" class="w-full rounded bg-emerald-600 hover:bg-emerald-700 text-white px-2 py-1.5 text-xs font-bold">✓ Selesai</button><div class="flex gap-2"><button onclick="editBooking('${b.id}')" class="text-uns-blue font-semibold">Edit</button><button onclick="deleteBooking('${b.id}')" class="text-rose-600 font-semibold">Hapus</button></div>`}</div></td></tr>`;
             }).join('');
             $('empty-state').classList.toggle('hidden',filtered.length>0);
             const totalKm=bookings.reduce((s,b)=>s+(Number(b.totalKm)||0),0), totalBbm=bookings.reduce((s,b)=>s+(Number(b.estimasiBiaya)||0),0), liter=bookings.reduce((s,b)=>s+(Number(b.estimasiLiter)||0),0);
@@ -1810,7 +2028,7 @@
             `${ADMINAUTO_ROOT}/bookings`
         ];
         const FALLBACK_SETTINGS_PATH = `${ADMINAUTO_ROOT}/simkendis_settings`;
-        const DEST_PATH = `${ADMINAUTO_ROOT}/simkendis_destinations`;
+        const DEST_PATH = 'simkendis/destinations';
 
         let adminAuthBlocked = false;
         let mainAuthBlocked = false;
@@ -1891,29 +2109,20 @@
         // Ekspos penyimpanan daftar tujuan online (tanpa melempar unhandled error jika 401)
         window.SIMKENDIS_DESTINATIONS = {
             async list() {
-                const res = await restReadSafe(ADMINAUTO_CONFIG.databaseURL, DEST_PATH, getAdminToken);
-                const localDest = JSON.parse(localStorage.getItem('simkendis_uns_destinations_v1') || '[]');
-                if (!res.ok || !res.data || typeof res.data !== 'object') return localDest;
-                const cloudList = Object.entries(res.data).map(([id,v])=>({...v,id})).filter(v=>v && v.name && Number(v.km)>0);
-                const merged = [...cloudList];
-                localDest.forEach(ld => {
-                    if (!merged.some(cd => String(cd.name).toLowerCase() === String(ld.name).toLowerCase())) merged.push(ld);
-                });
-                return merged.sort((a,b)=>String(a.name).localeCompare(String(b.name),'id'));
+                const res = await restReadSafe(SIMKENDIS_CONFIG.databaseURL, DEST_PATH, getMainToken);
+                if (!res.ok) throw new Error('Tidak dapat membaca tujuan dari Firebase (' + (res.error || res.status) + ').');
+                if (!res.data || typeof res.data !== 'object') return [];
+                return Object.entries(res.data).map(([id,v])=>({...v,id})).filter(v=>v && v.name && Number(v.km)>0).sort((a,b)=>String(a.name).localeCompare(String(b.name),'id'));
             },
             async save(item) {
                 const cleanName = String(item.name||'').trim();
                 if(!cleanName || !(Number(item.km)>0)) throw new Error('Nama tujuan/jarak tidak valid.');
                 const id = 'dst_'+cleanName.toLowerCase().replace(/[^a-z0-9]+/g,'_').slice(0,45);
-                const toSave = { ...item, id, name: cleanName, km: Number(item.km) };
-                // Simpan ke lokal terlebih dahulu agar selalu berhasil
-                const localDest = JSON.parse(localStorage.getItem('simkendis_uns_destinations_v1') || '[]').filter(x => x.id !== id);
-                localDest.push(toSave);
-                localStorage.setItem('simkendis_uns_destinations_v1', JSON.stringify(localDest));
-                // Coba sinkronkan ke cloud
-                const cloudPayload = { ...toSave };
-                delete cloudPayload.id;
-                await restWriteSafe(ADMINAUTO_CONFIG.databaseURL, `${DEST_PATH}/${id}`, cloudPayload, getAdminToken);
+                const toSave = { ...item, id, name: cleanName, km: Number(item.km), updatedAt: new Date().toISOString() };
+                const cloudPayload = { ...toSave }; delete cloudPayload.id;
+                const res = await restWriteSafe(SIMKENDIS_CONFIG.databaseURL, `${DEST_PATH}/${id}`, cloudPayload, getMainToken);
+                if (!res.ok) throw new Error('Tujuan tidak tersimpan ke Firebase (' + (res.error || res.status) + ').');
+                try { localStorage.setItem('simkendis_uns_destinations_v1', JSON.stringify(await this.list())); } catch (_) {}
                 return toSave;
             }
         };
@@ -1973,6 +2182,10 @@
                 id: x.id || x.fileUniqueId || x.fileId || ('S-TELEGRAM-' + i),
                 nominal,
                 noNota: x.noNota || x.nomor_struk || x.invoiceNo || x.invoiceNumber || '',
+            noTransaksi: x.noTransaksi || x.nomorTransaksi || x.no_transaksi || x.transactionNo || '',
+            tanggalStruk: x.tanggalStruk || x.tanggal || x.transactionDate || '',
+            volumeLiter: x.volumeLiter ?? x.volume ?? x.liter ?? '',
+            platNomor: x.platNomor || x.plat_nomor || '',
                 fileName: x.fileName || x.name || x.filename || x.originalName || ('Struk BBM ' + (i + 1)),
                 driveUrl,
                 driveFileId: x.driveFileId || x.fileId || x.file_id || '',
@@ -2044,47 +2257,32 @@
         }
 
         async function writeBookingsToCloud(cleanData) {
-            const payload = window.sanitizeForFirebase ? window.sanitizeForFirebase(cleanData) : cleanData;
+            const incoming = Array.isArray(cleanData) ? cleanData : [];
+            // Pull the latest cloud state immediately before writing, then merge by stable booking ID.
+            // This prevents a stale device from replacing unrelated bookings created by another device.
+            const latest = await loadBookingsFromCloud();
+            if (!latest.ok) return {ok:false, code:'CLOUD_READ_FAILED', error:'Tidak bisa membaca data terbaru sebelum menyimpan. Perubahan tidak dikirim agar data perangkat lain tidak tertimpa.'};
+            const cloudList = Array.isArray(latest.data) ? latest.data : [];
+            const priorSnapshot = (() => { try { return JSON.parse(lastCloudBookingsJson || '[]'); } catch (_) { return []; } })();
+            const incomingIds = new Set(incoming.filter(v=>v && v.id).map(v=>String(v.id)));
+            const priorIds = new Set((Array.isArray(priorSnapshot)?priorSnapshot:[]).filter(v=>v && v.id).map(v=>String(v.id)));
+            // A missing item counts as an intentional delete only if it existed in this device's last cloud snapshot.
+            const deletedIds = new Set([...priorIds].filter(id=>!incomingIds.has(id)));
+            const merged = new Map();
+            cloudList.forEach(v => { if (v && v.id && !deletedIds.has(String(v.id))) merged.set(String(v.id), v); });
+            incoming.forEach(v => { if (v && v.id) merged.set(String(v.id), v); });
+            const payload = window.sanitizeForFirebase ? window.sanitizeForFirebase(Array.from(merged.values())) : Array.from(merged.values());
 
-            // Jika sudah ada endpoint aktif yang terbukti terbuka, gunakan terlebih dahulu
-            if (activeCloudEndpoint) {
-                const res = await restWriteSafe(activeCloudEndpoint.baseUrl, activeCloudEndpoint.path, payload, activeCloudEndpoint.tokenFn);
-                if (res.ok) return { ok: true, target: activeCloudEndpoint.label };
+            // Write only to the endpoint that was successfully read. Avoid silently switching databases.
+            const endpoint = activeCloudEndpoint;
+            if (!endpoint) return {ok:false, code:'NO_CLOUD_ENDPOINT', error:'Endpoint Firebase belum terverifikasi.'};
+            const res = await restWriteSafe(endpoint.baseUrl, endpoint.path, payload, endpoint.tokenFn);
+            if (res.ok) {
+                activeCloudEndpoint = endpoint;
+                lastCloudBookingsJson = JSON.stringify(payload);
+                return {ok:true, target:endpoint.label};
             }
-
-            // 1. Coba SDK pada MainDB jika token tersedia
-            const mainToken = await getMainToken(false);
-            if (mainToken) {
-                try {
-                    await set(ref(mainDb, BOOKING_PATH), payload);
-                    activeCloudEndpoint = { baseUrl: SIMKENDIS_CONFIG.databaseURL, path: BOOKING_PATH, tokenFn: getMainToken, label: 'fleet-transaction-management' };
-                    return { ok: true, target: 'fleet-transaction-management' };
-                } catch (_) {}
-            }
-
-            // 2. Coba jalur REST pada MainDB (fleet-transaction-management)
-            for (const path of MAIN_ALT_PATHS) {
-                const res = await restWriteSafe(SIMKENDIS_CONFIG.databaseURL, path, payload, getMainToken);
-                if (res.ok) {
-                    activeCloudEndpoint = { baseUrl: SIMKENDIS_CONFIG.databaseURL, path, tokenFn: getMainToken, label: `fleet-transaction-management (${path})` };
-                    return { ok: true, target: activeCloudEndpoint.label };
-                }
-            }
-
-            // 3. Coba jalur REST pada Cloud Cadangan (uns-fleet-service)
-            for (const path of FALLBACK_ALT_PATHS) {
-                const res = await restWriteSafe(ADMINAUTO_CONFIG.databaseURL, path, payload, getAdminToken);
-                if (res.ok) {
-                    activeCloudEndpoint = { baseUrl: ADMINAUTO_CONFIG.databaseURL, path, tokenFn: getAdminToken, label: `uns-fleet-service (${path})` };
-                    return { ok: true, target: activeCloudEndpoint.label };
-                }
-            }
-
-            return {
-                ok: false,
-                code: 'HTTP_401_PERMISSION_DENIED',
-                error: 'Semua jalur tulis ditolak atau gagal. Periksa Anonymous Authentication, API key proyek, URL database, dan Rules pada path simkendis.'
-            };
+            return {ok:false, code:'CLOUD_WRITE_FAILED', error:`Gagal menyimpan ke ${endpoint.label}: ${res.error || res.status}`};
         }
 
         let lastCloudBookingsJson = '';
@@ -2118,11 +2316,40 @@
                 window.dispatchEvent(new CustomEvent('simkendis-firebase-status', {detail:{ok:false,message:'Gagal mengambil data Firebase',detail:result.error}}));
                 return {ok:false,error:result.error};
             }
-            const normalized = Array.isArray(result.data) ? result.data : [];
+            let normalized = Array.isArray(result.data) ? result.data : [];
+            // One-time per-device migration: upload local-only booking IDs that are absent in the cloud.
+            // Records with the same ID remain cloud-authoritative to avoid stale devices overwriting newer data.
+            const cloudIds = new Set(normalized.filter(v=>v && v.id).map(v=>String(v.id)));
+            const localOnly = startupLocalBookings.filter(v=>v && v.id && !cloudIds.has(String(v.id)));
+            if (localOnly.length) {
+                normalized = [...normalized, ...localOnly];
+                const migrated = await writeBookingsToCloud(normalized);
+                if (!migrated.ok) {
+                    window.dispatchEvent(new CustomEvent('simkendis-firebase-status',{detail:{ok:false,message:'Data lokal belum seluruhnya masuk cloud',detail:migrated.error||'Penyimpanan gagal'}}));
+                }
+            }
             lastCloudBookingsJson = JSON.stringify(normalized);
             window.dispatchEvent(new CustomEvent('simkendis-firebase-bookings-loaded', {detail:normalized}));
             const settings = await this.getSettings();
             if (settings && typeof settings === 'object') {
+                // Preserve device-only master records during migration; cloud values win for matching IDs.
+                const cloudMaster = settings.master && typeof settings.master === 'object' ? settings.master : settings;
+                const localMaster = safeParse(MASTER_STORAGE_KEY, null) || {};
+                const mergeUnique = (cloudArr, localArr) => {
+                    const out = Array.isArray(cloudArr) ? [...cloudArr] : [];
+                    const ids = new Set(out.map(v=>String(v?.id||v?.name||'')));
+                    (Array.isArray(localArr)?localArr:[]).forEach(v=>{const id=String(v?.id||v?.name||''); if(id && !ids.has(id)){out.push(v);ids.add(id);}});
+                    return out;
+                };
+                if (Array.isArray(localMaster.vehicles) || Array.isArray(localMaster.drivers)) {
+                    cloudMaster.vehicles = mergeUnique(cloudMaster.vehicles, localMaster.vehicles);
+                    cloudMaster.drivers = mergeUnique(cloudMaster.drivers, localMaster.drivers);
+                    if (!cloudMaster.fuelPrices && localMaster.fuelPrices) cloudMaster.fuelPrices = localMaster.fuelPrices;
+                    if (!cloudMaster.memoSources && localMaster.memoSources) cloudMaster.memoSources = localMaster.memoSources;
+                    settings.master = cloudMaster;
+                    const migratedSettings = await this.saveMasterSettings(cloudMaster);
+                    if (!migratedSettings.ok) window.dispatchEvent(new CustomEvent('simkendis-firebase-status',{detail:{ok:false,message:'Sebagian pengaturan lokal belum masuk cloud',detail:migratedSettings.error||'Penyimpanan gagal'}}));
+                }
                 lastCloudSettingsJson = JSON.stringify(settings);
                 applyCloudSettings(settings);
             }
@@ -2177,6 +2404,7 @@
                 if (r1.ok) { lastCloudSettingsJson = JSON.stringify(clean); return r1.data; }
                 const r2 = await restWriteSafe(ADMINAUTO_CONFIG.databaseURL, FALLBACK_SETTINGS_PATH, clean, getAdminToken);
                 if (r2.ok) { lastCloudSettingsJson = JSON.stringify(clean); return r2.data; }
+                window.dispatchEvent(new CustomEvent('simkendis-firebase-status',{detail:{ok:false,message:'Pengaturan belum tersimpan ke Firebase',detail:`MainDB: ${r1.error||r1.status}; cadangan: ${r2.error||r2.status}`}}));
                 return null;
             },
             async saveMasterSettings(masterData) {
