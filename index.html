@@ -1286,6 +1286,32 @@
             if(!m) throw new Error('Lampiran lokal tidak ditemukan untuk dipindai AI. Unggah ulang foto atau PDF.');
             return {mimeType:m[1],data:m[2]};
         }
+        function simkendisDriveId(source) {
+            if (!source) return '';
+            if (typeof source === 'object') {
+                if (source.fileId || source.driveFileId) return String(source.fileId || source.driveFileId);
+                source = source.driveUrl || source.url || source.webViewLink || '';
+            }
+            const text = String(source);
+            const patterns = [/\/d\/([A-Za-z0-9_-]{10,})/, /[?&]id=([A-Za-z0-9_-]{10,})/, /fileId=([A-Za-z0-9_-]{10,})/];
+            for (const re of patterns) { const m = text.match(re); if (m) return m[1]; }
+            return '';
+        }
+        async function geminiExtractDrive(fileRef,kind,mimeType='') {
+            if(!simkendisAiSettings || !simkendisAiSettings.model) await loadGeminiSettings();
+            if(kind==='receipt' && simkendisAiSettings.scanReceiptEnabled===false) throw new Error('Scan nota BBM dinonaktifkan pada pengaturan bersama.');
+            if(kind==='memo' && simkendisAiSettings.scanMemoEnabled===false) throw new Error('Scan memo dinonaktifkan pada pengaturan bersama.');
+            const fileId=simkendisDriveId(fileRef);
+            if(!fileId) throw new Error('ID file Drive tidak ditemukan pada lampiran ini.');
+            const token = await window.SIMKENDIS_FIREBASE?.getIdToken?.();
+            if(!token) throw new Error('Token autentikasi Firebase tidak tersedia untuk scan aman.');
+            setGeminiStatus('Membaca lampiran yang sudah tersimpan di Drive…');
+            const response=await fetch(SIMKENDIS_WORKER_URL + '/scan-drive', {method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify({type:kind==='memo'?'memo':'receipt',fileId,mimeType})});
+            const payload=await response.json().catch(()=>({}));
+            if(!response.ok || !payload.ok) throw new Error(payload.error || ('Scan lampiran Drive gagal ('+response.status+').'));
+            setGeminiStatus('Scan lampiran Drive selesai. Periksa hasil AI sebelum menyimpan.');
+            return payload.result;
+        }
         async function geminiExtract(dataUrl,kind) {
             if(!simkendisAiSettings || !simkendisAiSettings.model) await loadGeminiSettings();
             if(kind==='receipt' && simkendisAiSettings.scanReceiptEnabled===false) throw new Error('Scan nota BBM dinonaktifkan pada pengaturan bersama.');
@@ -1303,8 +1329,12 @@
         async function scanMemoWithGemini() {
             try {
               const src = tempUploads.memoLocalDataUrl || tempUploads.memoDataUrl;
-              if(!src) return toast('Unggah foto atau PDF memo terlebih dahulu.',true);
-              const r=await geminiExtract(src,'memo');
+              const existingBooking = bookings.find(b => b.id === $('edit-id').value);
+              const driveRef = src || tempUploads.memoDriveUrl || tempUploads.memoFile || existingBooking?.memoFile || existingBooking?.memoUrl || existingBooking?.memoDataUrl;
+              if(!driveRef) return toast('Belum ada lampiran memo yang tersimpan. Unggah memo terlebih dahulu.',true);
+              const r = (typeof driveRef === 'string' && driveRef.startsWith('data:'))
+                ? await geminiExtract(driveRef,'memo')
+                : await (simkendisDriveId(driveRef) ? geminiExtractDrive(driveRef,'memo') : geminiExtract(driveRef,'memo'));
               if(r.nomor_ajuan || r.nomor_memo) $('no-memo').value=String(r.nomor_ajuan || r.nomor_memo).trim();
               const memoAmount = Number(r.nominal_pengalihan_bbm ?? r.nominal) || 0;
               if(memoAmount>0) $('nominal-memo').value=formatNominalDisplay(Math.round(memoAmount));
@@ -1320,8 +1350,11 @@
             try {
               const s=formStrukList.find(x=>x.id===id); if(!s) return;
               const src = s.localDataUrl || s.dataUrl;
-              if(!src) return toast('Unggah foto atau PDF struk pada baris ini terlebih dahulu.',true);
-              const r=await geminiExtract(src,'receipt');
+              const driveRef = src || s.driveUrl || s.driveFileId || s.fileId || s.url;
+              if(!driveRef) return toast('Belum ada lampiran struk pada baris ini. Unggah struk terlebih dahulu.',true);
+              const r = (typeof driveRef === 'string' && driveRef.startsWith('data:'))
+                ? await geminiExtract(driveRef,'receipt')
+                : await (simkendisDriveId(driveRef) ? geminiExtractDrive(driveRef,'receipt',s.mimeType || '') : geminiExtract(driveRef,'receipt'));
               if(Number(r.nominal)>0) s.nominal=Math.round(Number(r.nominal));
               if(r.nomor_struk) s.noNota=String(r.nomor_struk).trim();
               if(r.no_transaksi || r.nomor_transaksi || r.transaction_no) s.noTransaksi=String(r.no_transaksi||r.nomor_transaksi||r.transaction_no).trim();
