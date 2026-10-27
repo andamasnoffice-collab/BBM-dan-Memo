@@ -1486,13 +1486,16 @@
             if (!apiKey) return null;
             const model = normalizeGeminiModelName(simkendisAiSettings?.model || 'gemini-2.5-flash');
             const prompt = kind === 'memo'
-                ? 'Analisis dokumen tabel rincian memo dinas / nota dinas resmi ini secara teliti:\n' +
-                  '1. Cari "Nomor Ajuan" atau "Nomor Memo/Surat" (format seperti 144724 / P-169 / 2026 atau angka/UN27..., abaikan nomor halaman seperti "Halaman 2 / 2").\n' +
-                  '2. Cari baris dalam tabel rincian anggaran yang Uraiannya bertuliskan "Pengalihan BBM", "BBM", "Bahan Bakar", atau "Bahan Bakar Minyak" (misal: "Pengalihan Anggaran ... Pengalihan BBM Monitoring Evaluasi...").\n' +
-                  '3. Ambil NOMINAL AKHIR pada kolom "Jumlah" atau "TOTAL" untuk baris BBM tersebut (contoh: jika Harga 4.300.000 dan Jumlah 8.600.000, AMBIL JUMLAH TOTALNYA YAITU 8600000, bukan harga satuan).\n' +
-                  '4. Ambil Unit Kerja / Pengaju jika ada.\n' +
-                  'Balas HANYA format JSON valid tanpa tanda markdown: {"nomor_ajuan":"","unit_kerja":"","nominal_bbm":8600000,"tanggal":"","confidence":"tinggi|sedang|rendah","catatan":""}. Nilai nominal harus berupa integer angka murni.'
-                : 'Baca struk BBM/SPBU Indonesia. Ambil total harga yang dibayar (integer rupiah), tanggal transaksi (YYYY-MM-DD), nomor struk/SPBU, nomor transaksi (Shift/No.Trans), volume liter (angka desimal titik), dan plat nomor kendaraan jika tercetak. Balas JSON saja: {"nominal":0,"tanggal":"","nomor_struk":"","no_transaksi":"","volume_liter":0,"plat_nomor":"","nama_spbu":"","jenis_bbm":"","confidence":"tinggi|sedang|rendah","catatan":""}.';
+                ? 'Analisis dokumen memo / nota dinas resmi ini secara teliti:\n' +
+                  'Hanya cari dan ambil "Nomor Ajuan" atau "Nomor Memo/Surat" (contoh format: 144724 / P-169 / 2026 atau nomor dinas dengan UN27..., abaikan nomor halaman seperti "Halaman 2 / 2"). Jangan membaca nominal.\n' +
+                  'Balas HANYA format JSON valid tanpa tanda markdown: {"nomor_ajuan":"","confidence":"tinggi|sedang|rendah","catatan":""}.'
+                : 'Analisis struk BBM / SPBU Indonesia secara teliti. Cari dan ambil 4 informasi pokok berikut:\n' +
+                  '1. "no_transaksi": Cari baris yang tertulis "No. Trans:", "No Trans:", "No. Transaksi:", atau "No. Trx:". Ambil nilai kodenya persis (contoh jika tertulis "No. Trans: 9382104", isi "9382104"). JANGAN mengisi nomor SPBU (44.xxx/31.xxx), nomor pompa, atau shift jika baris No. Trans ada!\n' +
+                  '2. "tanggal": Tanggal transaksi dalam format YYYY-MM-DD.\n' +
+                  '3. "volume_liter": Volume BBM dalam liter (desimal titik, contoh: 40.237).\n' +
+                  '4. "nominal": Total harga / rupiah yang dibayar (angka integer tanpa titik/koma rupiah).\n' +
+                  '5. "plat_nomor": Plat nomor kendaraan jika tercetak pada struk.\n' +
+                  'Balas HANYA format JSON valid tanpa tanda markdown: {"no_transaksi":"","tanggal":"","volume_liter":0,"nominal":0,"plat_nomor":"","confidence":"tinggi|sedang|rendah","catatan":""}.';
 
             const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`, {
                 method: 'POST',
@@ -1511,7 +1514,7 @@
         function parseOcrTextSmart(rawText, kind) {
             const text = String(rawText || '').replace(/\r/g, '\n');
             if (kind === 'memo') {
-                // Deteksi nomor ajuan memo (misal: 144724 / P-169 / 2026 atau no surat UN27)
+                // Deteksi hanya nomor ajuan memo
                 const noMatch = text.match(/(?:Nomor\s*Ajuan|No\.?\s*Ajuan|Ajuan)\s*[:.]?\s*([0-9A-Z\s\/\-.]+)/i)
                     || text.match(/([0-9]{3,8}\s*[\/\-]\s*[A-Z0-9.\-]+\s*[\/\-]\s*20\d{2})/i)
                     || text.match(/(?:Nomor|No\.?)\s*[:.]?\s*([0-9]{1,6}\s*\/\s*UN27[^\s\n]*)/i)
@@ -1523,59 +1526,13 @@
                     nomorAjuan = noMatch[1].trim().replace(/^[:.\s]+/, '').replace(/[\n\r].*$/, '').trim();
                 }
 
-                // Ekstraksi nominal khusus baris/tabel BBM atau Pengalihan BBM
-                let nominal = 0;
-                const lines = text.split('\n');
-
-                // 1. Cari baris yang mengandung 'BBM' atau 'Pengalihan BBM'
-                for (let i = 0; i < lines.length; i++) {
-                    const line = lines[i];
-                    if (/(?:pengalihan\s*bbm|bbm|bahan\s*bakar)/i.test(line)) {
-                        // Kumpulkan baris saat ini dan 2 baris setelahnya (mengantisipasi kolom tabel terpisah baris saat OCR)
-                        const contextChunk = lines.slice(i, Math.min(lines.length, i + 3)).join(' ');
-                        const amounts = [...contextChunk.matchAll(/(?:Rp\.?\s*)?([0-9]{1,3}(?:[.,][0-9]{3})+)/gi)]
-                            .map(m => Number(m[1].replace(/[^0-9]/g, '')) || 0)
-                            .filter(n => n >= 10000 && n <= 500000000);
-                        
-                        if (amounts.length > 0) {
-                            // Ambil nilai terbesar di baris/tabel tersebut karena kolom "Jumlah" adalah hasil perkalian (terbesar)
-                            nominal = Math.max(...amounts);
-                            break;
-                        }
-                    }
-                }
-
-                // 2. Jika ada baris "TOTAL" setelah baris BBM
-                if (!nominal) {
-                    const totalMatch = text.match(/(?:TOTAL|Jumlah)\s*[:.]?\s*(?:Rp\.?\s*)?([0-9]{1,3}(?:[.,][0-9]{3})+)/i);
-                    if (totalMatch) {
-                        nominal = Number(totalMatch[1].replace(/[^0-9]/g, '')) || 0;
-                    }
-                }
-
-                // 3. Fallback jika format tabel memisahkan angka
-                if (!nominal) {
-                    const bbmIndex = text.search(/pengalihan\s*bbm|bbm|bahan\s*bakar/i);
-                    if (bbmIndex !== -1) {
-                        const snippet = text.slice(bbmIndex, bbmIndex + 300);
-                        const amounts = [...snippet.matchAll(/(?:Rp\.?\s*)?([0-9]{1,3}(?:[.,][0-9]{3})+)/gi)]
-                            .map(m => Number(m[1].replace(/[^0-9]/g, '')) || 0)
-                            .filter(n => n >= 10000 && n <= 500000000);
-                        if (amounts.length > 0) {
-                            nominal = Math.max(...amounts);
-                        }
-                    }
-                }
-
                 return {
                     nomor_ajuan: nomorAjuan,
-                    nominal_bbm: nominal,
-                    nominal_pengalihan_bbm: nominal,
-                    unit_kerja: '',
-                    confidence: (nominal > 0 && nomorAjuan) ? 'tinggi' : (nominal > 0 ? 'sedang' : 'rendah'),
-                    catatan: 'Diekstrak dari kolom Jumlah/Total pada baris Pengalihan BBM.'
+                    confidence: nomorAjuan ? 'tinggi' : 'rendah',
+                    catatan: 'Hanya mengambil nomor ajuan memo.'
                 };
             } else {
+                // Struk BBM: Ambil Nomor Transaksi, Tanggal, Volume Liter, dan Nominal
                 let nominal = 0;
                 const totalLine = text.match(/(?:Total\s*Harga|Total\s*Bayar|Jumlah|Total|Tunai|Cash)\s*[:.]?\s*(?:Rp\.?\s*)?([0-9]{1,3}(?:[.,][0-9]{3})+)/i);
                 if (totalLine) {
@@ -1587,10 +1544,15 @@
                     if (allAmounts.length) nominal = Math.max(...allAmounts);
                 }
 
-                const spbuMatch = text.match(/SPBU\s*([0-9.]{5,12})/i) || text.match(/\b(44[0-9]{5,7})\b/);
-                const transMatch = text.match(/(?:No\.?\s*Trans(?:aksi)?|Nota|bon)\s*[:.#]?\s*([A-Z0-9-]{4,20})/i);
-                const volMatch = text.match(/(?:Volume|Liter|Vol)\s*(?:\([Ll]\))?\s*[:.]?\s*([0-9]{1,3}[.,][0-9]{1,3})/i)
+                // Cari persis baris No. Trans: xxxxxxxx
+                const transMatch = text.match(/(?:No\.?\s*Trans(?:aksi)?|No\.?\s*Trx|Shift\/No\.?\s*Trans)\s*[:.#]?\s*([A-Za-z0-9\/\-_]+)/i)
+                    || text.match(/(?:Receipt\s*No|Trace\s*No|No\.?\s*Faktur)\s*[:.#]?\s*([A-Za-z0-9\/\-_]+)/i)
+                    || text.match(/Trans(?:aksi)?\s*[:.#]?\s*([A-Za-z0-9\/\-_]+)/i);
+                const noTransaksi = transMatch ? transMatch[1].trim().replace(/^[:.\s]+/, '') : '';
+
+                const volMatch = text.match(/(?:Volume|Liter|Vol|Jumlah\s*Liter)\s*(?:\([Ll]\))?\s*[:.]?\s*([0-9]{1,3}[.,][0-9]{1,3})/i)
                     || text.match(/([0-9]{1,3}[.,][0-9]{2,3})\s*(?:L|Liter)\b/i);
+
                 const dateMatch = text.match(/\b(\d{1,2})[/-](\d{1,2})[/-](20\d{2})\b/) || text.match(/\b(20\d{2})[/-](\d{1,2})[/-](\d{1,2})\b/);
                 let formattedDate = '';
                 if (dateMatch) {
@@ -1600,18 +1562,18 @@
                         formattedDate = `${dateMatch[3]}-${dateMatch[2].padStart(2,'0')}-${dateMatch[1].padStart(2,'0')}`;
                     }
                 }
+
                 const plateMatch = text.match(/\b(AD|B|AB|AA|H|G|K|R|AE|AG|L|W|N|S|D|F|T|E|Z)\s*(\d{1,4})\s*([A-Z]{1,3})\b/);
                 const plate = plateMatch ? `${plateMatch[1]} ${plateMatch[2]} ${plateMatch[3]}` : '';
 
                 return {
+                    no_transaksi: noTransaksi,
                     nominal,
-                    nomor_struk: spbuMatch ? spbuMatch[1].trim() : (transMatch ? transMatch[1].trim() : ''),
-                    no_transaksi: transMatch ? transMatch[1].trim() : '',
                     tanggal: formattedDate,
                     volume_liter: volMatch ? volMatch[1].replace(',', '.') : '',
                     plat_nomor: plate,
-                    confidence: nominal > 0 ? 'sedang (OCR Lokal)' : 'rendah',
-                    catatan: 'Diekstrak otomatis dengan OCR Lokal.'
+                    confidence: (noTransaksi || nominal > 0) ? 'sedang (OCR Lokal)' : 'rendah',
+                    catatan: 'Diekstrak otomatis via OCR Lokal.'
                 };
             }
         }
@@ -1755,7 +1717,7 @@
 
                 if (btn) {
                     btn.disabled = true;
-                    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> <span>Memindai Nomor Ajuan & BBM...</span>';
+                    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> <span>Memindai Nomor Ajuan...</span>';
                 }
 
                 const r = await geminiExtractUniversal({
@@ -1766,30 +1728,14 @@
                     existingScan
                 });
 
-                // Ekstraksi Nomor Ajuan / Nomor Memo
+                // Ekstraksi hanya Nomor Ajuan / Nomor Memo
                 const detectedNo = String(r.nomor_ajuan || r.nomor_memo || r.no_ajuan || r.no_memo || '').trim();
                 if (detectedNo) {
                     $('no-memo').value = detectedNo;
+                    toast(`Nomor Ajuan ditemukan: ${detectedNo}`);
+                } else {
+                    toast('Nomor Ajuan tidak terbaca jelas. Silakan periksa dokumen memo.', true);
                 }
-
-                // Ekstraksi Nominal khusus kolom/baris BBM / Bahan Bakar
-                const memoAmount = Number(r.nominal_bbm ?? r.nominal_pengalihan_bbm ?? r.nominal ?? r.bbm ?? 0) || 0;
-                if (memoAmount > 0) {
-                    $('nominal-memo').value = formatNominalDisplay(Math.round(memoAmount));
-                }
-
-                const unit = String(r.unit_kerja || r.sumber || '').trim();
-                if (unit) {
-                    const match = memoSources.find(x => x.toLowerCase() === unit.toLowerCase());
-                    if (match) $('memo-dari').value = match;
-                    window.__simkendisScannedMemoUnit = unit;
-                }
-
-                if ((r.status && /cair|dibayar|terbayar/i.test(r.status)) || memoAmount > 0) {
-                    $('status-memo').value = 'Sudah Cair';
-                }
-
-                toast(`Memo berhasil dipindai! No Ajuan: ${$('no-memo').value || '-'}, BBM: Rp ${$('nominal-memo').value || '0'}`);
             } catch (e) {
                 setGeminiStatus(e.message, true);
                 toast(e.message, true);
@@ -1827,11 +1773,17 @@
                     existingScan
                 });
 
-                if (Number(r.nominal) > 0) s.nominal = Math.round(Number(r.nominal));
-                if (r.nomor_struk) s.noNota = String(r.nomor_struk).trim();
-                if (r.no_transaksi || r.nomor_transaksi || r.transaction_no) {
-                    s.noTransaksi = String(r.no_transaksi || r.nomor_transaksi || r.transaction_no).trim();
+                // 1. Nomor Struk memakai Nomor Transaksi
+                const transNo = String(r.no_transaksi || r.nomor_transaksi || r.transaction_no || r.nomor_struk || '').trim();
+                if (transNo) {
+                    s.noNota = transNo;
+                    s.noTransaksi = transNo;
                 }
+
+                // 2. Total Harga (Nominal)
+                if (Number(r.nominal) > 0) s.nominal = Math.round(Number(r.nominal));
+
+                // 3. Tanggal Transaksi
                 if (r.tanggal || r.tanggal_transaksi || r.transaction_date) {
                     const rawDate = String(r.tanggal_transaksi || r.transaction_date || r.tanggal).trim();
                     const iso = rawDate.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
@@ -1842,16 +1794,21 @@
                             ? `${dmy[3]}-${dmy[2].padStart(2, '0')}-${dmy[1].padStart(2, '0')}`
                             : (s.tanggalStruk || '');
                 }
+
+                // 4. Volume dalam Liter
                 if (r.volume_liter ?? r.volume ?? r.liter) {
                     s.volumeLiter = String(r.volume_liter ?? r.volume ?? r.liter).replace(/[^0-9,.]/g, '');
                 }
+
+                // Plat nomor (opsional jika ada)
                 if (r.plat_nomor || r.platNomor || r.plate_number) {
                     s.platNomor = String(r.plat_nomor || r.platNomor || r.plate_number).trim().toUpperCase();
                 }
+
                 s.scanConfidence = r.confidence || '';
                 s.scanNotes = r.catatan || '';
                 if ($('status-struk').value === 'Belum Ada') $('status-struk').value = 'Terlampir';
-                toast(`Struk berhasil dipindai! Nominal: ${rupiah(s.nominal || 0)}`);
+                toast(`Struk dipindai! No. Trans: ${s.noNota || '-'}, Vol: ${s.volumeLiter || '-'} L, Total: ${rupiah(s.nominal || 0)}`);
             } catch (e) {
                 setGeminiStatus(e.message, true);
                 toast(e.message, true);
@@ -2061,24 +2018,20 @@
                         <div class="space-y-3">
                             <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                                 <div>
-                                    <label class="block text-[11px] font-bold text-slate-600 mb-1">Nominal Struk (Rp)</label>
+                                    <label class="block text-[11px] font-bold text-slate-600 mb-1">Nominal Struk (Total Harga)</label>
                                     <input type="text" inputmode="numeric" autocomplete="off" value="${esc(formatNominalDisplay(s.nominal))}" placeholder="Contoh: 1.310.220" oninput="formatStrukNominal(this,'${s.id}')" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-extrabold text-emerald-700 bg-emerald-50/20 focus:ring-2 focus:ring-emerald-500 outline-none">
                                 </div>
                                 <div>
-                                    <label class="block text-[11px] font-bold text-slate-600 mb-1">Nomor Struk / SPBU</label>
-                                    <input value="${esc(s.noNota||'')}" placeholder="Cth: 44.571.02" oninput="updateStruk('${s.id}','noNota',this.value)" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-medium focus:ring-2 focus:ring-uns-blue outline-none">
+                                    <label class="block text-[11px] font-bold text-slate-600 mb-1">No. Struk (Nomor Transaksi SPBU)</label>
+                                    <input value="${esc(s.noNota||s.noTransaksi||'')}" placeholder="Nomor Transaksi / Shift" oninput="updateStruk('${s.id}','noNota',this.value); updateStruk('${s.id}','noTransaksi',this.value);" class="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-medium focus:ring-2 focus:ring-uns-blue outline-none">
                                 </div>
                             </div>
                             <div class="rounded-xl border border-sky-100 bg-sky-50/60 p-3 space-y-2">
                                 <div class="text-[11px] font-bold text-sky-950 flex items-center gap-1.5">
                                     <i class="fa-solid fa-circle-info text-sky-600"></i>
-                                    <span>Detail Transaksi (Otomatis dari AI / Manual)</span>
+                                    <span>Detail Transaksi (Hasil AI Scan / Manual)</span>
                                 </div>
                                 <div class="grid grid-cols-2 gap-2">
-                                    <div>
-                                        <label class="block text-[10px] text-slate-500 font-semibold mb-0.5">No. Transaksi</label>
-                                        <input value="${esc(s.noTransaksi||s.nomorTransaksi||'')}" placeholder="No. transaksi" oninput="updateStruk('${s.id}','noTransaksi',this.value)" class="w-full px-2.5 py-1.5 border rounded-lg text-xs bg-white">
-                                    </div>
                                     <div>
                                         <label class="block text-[10px] text-slate-500 font-semibold mb-0.5">Tanggal Struk</label>
                                         <input type="date" value="${esc(s.tanggalStruk||s.tanggal||'')}" oninput="updateStruk('${s.id}','tanggalStruk',this.value)" class="w-full px-2.5 py-1.5 border rounded-lg text-xs bg-white">
@@ -2088,7 +2041,11 @@
                                         <input type="text" inputmode="decimal" value="${esc(s.volumeLiter??'')}" placeholder="Cth: 51.99" oninput="updateStruk('${s.id}','volumeLiter',this.value)" class="w-full px-2.5 py-1.5 border rounded-lg text-xs bg-white">
                                     </div>
                                     <div>
-                                        <label class="block text-[10px] text-slate-500 font-semibold mb-0.5">Plat Nomor</label>
+                                        <label class="block text-[10px] text-slate-500 font-semibold mb-0.5">No. Transaksi</label>
+                                        <input value="${esc(s.noTransaksi||s.noNota||'')}" placeholder="No. transaksi" oninput="updateStruk('${s.id}','noTransaksi',this.value); updateStruk('${s.id}','noNota',this.value);" class="w-full px-2.5 py-1.5 border rounded-lg text-xs bg-white">
+                                    </div>
+                                    <div>
+                                        <label class="block text-[10px] text-slate-500 font-semibold mb-0.5">Plat Nomor (Opsional)</label>
                                         <input value="${esc(s.platNomor||s.plat_nomor||'')}" placeholder="Cth: AD 1024 XA" oninput="updateStruk('${s.id}','platNomor',this.value.toUpperCase())" class="w-full px-2.5 py-1.5 border rounded-lg text-xs bg-white uppercase font-bold">
                                     </div>
                                 </div>
