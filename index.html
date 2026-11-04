@@ -249,6 +249,10 @@
 
                 <div class="flex flex-wrap items-center gap-2 w-full md:w-auto">
                     <div class="flex items-center gap-1.5 flex-1 sm:flex-none">
+                        <span class="text-[11px] font-bold text-slate-400 shrink-0">Tahun:</span>
+                        <select id="filter-year" onchange="changeBookingYear(this.value)" aria-label="Pilih tahun data" class="w-full sm:w-auto px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold bg-white text-slate-700 outline-none focus:ring-2 focus:ring-uns-blue cursor-pointer"></select>
+                    </div>
+                    <div class="flex items-center gap-1.5 flex-1 sm:flex-none">
                         <span class="text-[11px] font-bold text-slate-400 shrink-0">Urut:</span>
                         <select id="sort-bookings" onchange="renderTable()" aria-label="Urutkan jadwal" class="w-full sm:w-auto px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold bg-white text-slate-700 outline-none focus:ring-2 focus:ring-uns-blue cursor-pointer">
                             <option value="date-desc">Tanggal: Terbaru</option>
@@ -984,7 +988,6 @@
         }
 
         let bookings = safeParse(STORAGE_KEY, []);
-        const startupLocalBookings = Array.isArray(bookings) ? structuredClone(bookings) : [];
         let savedMaster = safeParse(MASTER_STORAGE_KEY, null);
         masterVehicles = Array.isArray(savedMaster?.vehicles) && savedMaster.vehicles.length ? savedMaster.vehicles : structuredClone(defaultVehicles);
         masterDrivers = Array.isArray(savedMaster?.drivers) && savedMaster.drivers.length ? savedMaster.drivers : structuredClone(defaultDrivers);
@@ -1003,6 +1006,18 @@
             clearTimeout(window.__toastTimer); window.__toastTimer=setTimeout(()=>{el.classList.add('hidden');el.classList.remove('flex')},6500);
     }
 
+    function populateBookingYearFilter() {
+        const el=$('filter-year'); if(!el) return;
+        const y=new Date().getFullYear();
+        el.innerHTML=Array.from({length:y-1997},(_,i)=>String(y+2-i)).map(v=>`<option value="${v}">${v}</option>`).join('');
+        el.value=String(y);
+    }
+    async function changeBookingYear(year) {
+        if(!/^20\d{2}$/.test(String(year))) return;
+        const result=await window.SIMKENDIS_FIREBASE?.refresh(String(year));
+        if(result?.ok) toast(`Data tahun ${year} berhasil dimuat.`);
+        else toast(`Gagal memuat data tahun ${year}: ${result?.error||'database tidak tersedia.'}`,true);
+    }
     async function refreshFirebaseData() {
         if (!window.SIMKENDIS_FIREBASE) {
             toast('Modul Firebase sedang dimuat, coba sesaat lagi.', true);
@@ -1018,19 +1033,18 @@
     }
 
     function persistBookings() {
-            try {
-                const cleanBookings = sanitizeForFirebase(bookings) || [];
-                bookings = cleanBookings;
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(cleanBookings));
-                if (window.SIMKENDIS_FIREBASE) {
-                    window.SIMKENDIS_FIREBASE.saveBookings(cleanBookings).catch(err => console.warn(err));
-                }
-                return true;
-            } catch(e) {
-                toast('Penyimpanan lokal penuh.', true);
-                return false;
+        try {
+            const cleanBookings = sanitizeForFirebase(bookings) || [];
+            bookings = cleanBookings;
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(cleanBookings));
+            if (window.SIMKENDIS_FIREBASE) {
+                window.SIMKENDIS_FIREBASE.saveBookings(cleanBookings).then(res => {
+                    if (!res?.ok) toast('Data tersimpan lokal, sinkronisasi database utama gagal: ' + (res?.error || 'periksa koneksi.'), true);
+                }).catch(err => toast('Sinkronisasi database gagal: ' + (err?.message || err), true));
             }
-        }
+            return true;
+        } catch(e) { toast('Penyimpanan lokal penuh.', true); return false; }
+    }
 
         document.addEventListener('DOMContentLoaded', () => {
             const startDate=$('tanggal'), endDate=$('tanggal-selesai');
@@ -1093,16 +1107,18 @@
     });
 
     function persistMaster(syncToCloud = true) {
-            try {
-                const payload = sanitizeForFirebase({vehicles:masterVehicles,drivers:masterDrivers,fuelPrices,memoSources, updatedAt:new Date().toISOString()});
-                localStorage.setItem(MASTER_STORAGE_KEY, JSON.stringify(payload));
-                if (syncToCloud && window.SIMKENDIS_FIREBASE?.saveMasterSettings) {
-                    window.SIMKENDIS_FIREBASE.saveMasterSettings(payload).catch(err => console.warn(err));
-                }
-                return true;
+        try {
+            const payload = sanitizeForFirebase({vehicles:masterVehicles,drivers:masterDrivers,fuelPrices,memoSources,updatedAt:new Date().toISOString()});
+            localStorage.setItem(MASTER_STORAGE_KEY, JSON.stringify(payload));
+            if (syncToCloud && window.SIMKENDIS_FIREBASE?.saveMasterSettings) {
+                return window.SIMKENDIS_FIREBASE.saveMasterSettings(payload).then(res => {
+                    if (!res?.ok) { toast('Master Data tersimpan lokal, tetapi gagal disinkronkan ke database utama.', true); return false; }
+                    return true;
+                }).catch(err => { toast('Gagal menyinkronkan Master Data: '+(err?.message||err),true); return false; });
             }
-            catch(e) { return false; }
-        }
+            return Promise.resolve(true);
+        } catch(e) { return Promise.resolve(false); }
+    }
 
         function saveFuelConfig() {
             const p=Number($('cfg-pertamax').value), d=Number($('cfg-dexlite').value);
@@ -1111,7 +1127,7 @@
             persistMaster(true); 
             calculateBBM(); 
             renderTable(); 
-            toast('Harga BBM berhasil disimpan dan disinkronkan ke Cloud.');
+            toast('Harga BBM disimpan. Status sinkronisasi ditampilkan terpisah jika terjadi kendala.');
         }
 
         function renderMaster() {
@@ -1158,7 +1174,7 @@
             const duplicate=masterVehicles.find(v=>v.name.toLowerCase()===name.toLowerCase());
             if(duplicate) Object.assign(duplicate,{ratio,fuel,isActive:true});
             else masterVehicles.push({id:uid('V'),name,ratio,fuel,isActive:true});
-            persistMaster(true); renderMaster(); calculateBBM(); e.target.reset(); toast('Data kendaraan disimpan dan disinkronkan.');
+            persistMaster(true); renderMaster(); calculateBBM(); e.target.reset(); toast('Data kendaraan disimpan. Sinkronisasi database utama sedang diproses.');
         }
 
         function addMasterDriver(e) {
@@ -1171,7 +1187,7 @@
             } else {
                 masterDrivers.push({id:uid('D'),name,phone,isActive:true});
             }
-            persistMaster(true); renderMaster(); e.target.reset(); toast('Data Driver disimpan dan disinkronkan.');
+            persistMaster(true); renderMaster(); e.target.reset(); toast('Data Driver disimpan. Sinkronisasi database utama sedang diproses.');
         }
 
         function addMemoSource(e) {
@@ -1179,7 +1195,7 @@
             if(!name) return;
             if(memoSources.some(x=>x.toLocaleLowerCase('id-ID')===name.toLocaleLowerCase('id-ID'))) return toast('Sumber memo sudah ada.',true);
             memoSources.push(name); memoSources.sort((a,b)=>a.localeCompare(b,'id-ID')); 
-            persistMaster(true); renderMaster(); $('memo-source-name').value=''; toast('Sumber memo ditambahkan dan disinkronkan.');
+            persistMaster(true); renderMaster(); $('memo-source-name').value=''; toast('Sumber memo disimpan. Sinkronisasi database utama sedang diproses.');
         }
 
         function deleteMemoSource(index) {
@@ -1192,7 +1208,7 @@
 
             memoSources = memoSources.filter(x => x.toLocaleLowerCase('id-ID') !== targetName.toLocaleLowerCase('id-ID'));
             if (!memoSources.length) memoSources = ['Perencanaan'];
-            persistMaster(true); renderMaster(); toast(`Sumber memo "${targetName}" dihapus.`);
+            persistMaster(true); renderMaster(); toast(`Sumber memo "${targetName}" dihapus. Sinkronisasi database utama sedang diproses.`);
         }
 
         const SIMKENDIS_ADMIN_PASSWORD = 'SIMKENDIS2026';
@@ -1215,10 +1231,15 @@
         function handleDestinationChange() {
             const sel=$('tujuan-preset'), opt=sel.options[sel.selectedIndex], custom=sel.value==='custom';
             $('custom-tujuan-wrapper').classList.toggle('hidden',!custom);
+            window.__simkendisCurrentDestination = null;
             if(!custom) {
                 $('jarak-satu-arah').value=Number(opt.dataset.km)||1;
                 if(opt.dataset.onlineName) $('tujuan-online-query').value=opt.dataset.onlineName;
-                if(opt.dataset.cloud==='true') { $('pakai-etoll').checked=opt.dataset.toll==='true'; $('estimasi-etoll').value=Number(opt.dataset.tollCost)||0; $('estimasi-etoll').disabled=!$('pakai-etoll').checked; }
+                if(opt.dataset.cloud==='true') {
+                    $('pakai-etoll').checked=opt.dataset.toll==='true'; $('estimasi-etoll').value=Number(opt.dataset.tollCost)||0; $('estimasi-etoll').disabled=!$('pakai-etoll').checked;
+                    const lat=Number(opt.dataset.lat), lon=Number(opt.dataset.lon);
+                    if(Number.isFinite(lat)&&Number.isFinite(lon)) window.__simkendisCurrentDestination={name:opt.dataset.onlineName||opt.textContent,lat,lon,km:Number(opt.dataset.km)||0,source:'saved-destination'};
+                }
             }
             calculateBBM();
         }
@@ -1296,8 +1317,9 @@
             if(!window.SIMKENDIS_DESTINATIONS?.save) return toast('Koneksi database tujuan belum siap.',true);
             try {
                 const item=sanitizeForFirebase({...d, toll: $('pakai-etoll').checked, tollCost:Number($('estimasi-etoll').value)||0, updatedAt:new Date().toISOString()});
-                await window.SIMKENDIS_DESTINATIONS.save(item);
-                await muatTujuanOnline(); toast('Tujuan berhasil disimpan.');
+                const saved = await window.SIMKENDIS_DESTINATIONS.save(item);
+                if (!saved?.ok) throw new Error(saved?.error || 'Firebase tidak mengonfirmasi penyimpanan.');
+                await muatTujuanOnline(); toast('Tujuan berhasil disimpan ke database utama.');
             } catch(e) { toast('Gagal menyimpan tujuan online: '+(e.message||''),true); }
         }
 
@@ -1909,7 +1931,7 @@
             if (!existing && !tempUploads.memoLocalDataUrl) return toast('Belum ada lampiran memo untuk dihapus.', true);
             if (!confirm('Hapus lampiran memo ini?')) return;
             try {
-                if (fileId) await deleteDriveAttachment(fileId).catch(() => {});
+                if (fileId) await deleteDriveAttachment(fileId);
                 tempUploads.memoDataUrl = null;
                 tempUploads.memoLocalDataUrl = null;
                 const old = bookings.find(b => b.id === $('edit-id').value);
@@ -1927,7 +1949,7 @@
             if (!confirm('Hapus lampiran struk ini?')) return;
             try {
                 const fileId = item.driveFileId || extractDriveFileId(item.driveUrl);
-                if (fileId) await deleteDriveAttachment(fileId).catch(() => {});
+                if (fileId) await deleteDriveAttachment(fileId);
                 item.driveUrl = null; item.driveFileId = ''; item.folderPath = '';
                 item.dataUrl = null; item.localDataUrl = null; item.fileName = '';
                 item.uploading = false;
@@ -2282,6 +2304,7 @@
         }
 
         function resetForm() {
+            window.__simkendisCurrentDestination = null;
             closeBookingFormModal();
             $('booking-form').reset(); $('edit-id').value=''; 
             setFormUIMode(false);
@@ -2817,6 +2840,7 @@
         }
 
         window.sanitizeForFirebase = sanitizeForFirebase;
+        populateBookingYearFilter();
         applyAdminModeUI();
         applyMasterLocalSettings();
         renderMaster();
@@ -2826,6 +2850,7 @@
         $('tanggal-selesai').min = initialToday;
         setFormUIMode(false);
         renderFormStrukItems();
+        if ($('tujuan-detail')) $('tujuan-detail').addEventListener('input', () => { window.__simkendisCurrentDestination = null; });
         calculateBBM();
         normalizeMemoPaidStatuses();
         renderTable();
@@ -2836,18 +2861,7 @@
     <script type="module">
         import { initializeApp, getApps } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
         import { initializeAuth, getAuth, inMemoryPersistence, signInAnonymously } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
-        import { getDatabase, ref, get } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js';
-
-        const ADMINAUTO_CONFIG = {
-            apiKey: 'AIzaSyAi0Ucng_tl7jSC9gZtr0JItCBUtkt-vvU',
-            authDomain: 'uns-fleet-service.firebaseapp.com',
-            databaseURL: 'https://uns-fleet-service-default-rtdb.asia-southeast1.firebasedatabase.app',
-            projectId: 'uns-fleet-service',
-            storageBucket: 'uns-fleet-service.firebasestorage.app',
-            messagingSenderId: '881806830475',
-            appId: '1:881806830475:web:8dcf991ec95ae93b625d8e'
-        };
-        const ADMINAUTO_ROOT = 'artifacts/uns-fleet-service/public/data_v2';
+        import { getDatabase, ref, get, set, runTransaction } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js';
 
         const SIMKENDIS_CONFIG = {
             apiKey: "AIzaSyADJoMRWZPS-vJl3U3cRgxydFGWeqs326Y4",
@@ -2859,48 +2873,23 @@
             appId: "1:558192360695:web:c27216b4ad0c7ba492a7f2"
         };
 
-        const adminApp = getApps().find(a => a.name === 'SIMKENDIS_AdminAutoReader') || initializeApp(ADMINAUTO_CONFIG, 'SIMKENDIS_AdminAutoReader');
-        let adminAuth;
-        try { adminAuth = initializeAuth(adminApp, { persistence: inMemoryPersistence }); }
-        catch (_) { adminAuth = getAuth(adminApp); }
-
         const mainApp = getApps().find(a => a.name === 'SIMKENDIS_MainDB') || initializeApp(SIMKENDIS_CONFIG, 'SIMKENDIS_MainDB');
         let mainAuth;
         try { mainAuth = initializeAuth(mainApp, { persistence: inMemoryPersistence }); }
         catch (_) { mainAuth = getAuth(mainApp); }
         const mainDb = getDatabase(mainApp);
 
-        const BOOKING_PATH = 'simkendis/bookings';
+        const BOOKING_PATH = 'simkendis/bookings'; // sumber lama untuk migrasi satu kali
+        const BOOKINGS_BY_YEAR_PATH = 'simkendis/bookingsByYear';
         const SETTINGS_PATH = 'simkendis/settings';
-        const MAIN_ALT_PATHS = [
-            'simkendis/bookings',
-            'bookings',
-            'artifacts/fleet-transaction-management/public/data/bookings',
-            'artifacts/fleet-transaction-management/public/data_v2/bookings'
-        ];
-        const FALLBACK_ALT_PATHS = [
-            `${ADMINAUTO_ROOT}/simkendis_bookings`,
-            `${ADMINAUTO_ROOT}/bookings`
-        ];
-        const FALLBACK_SETTINGS_PATH = `${ADMINAUTO_ROOT}/simkendis_settings`;
         const DEST_PATH = 'simkendis/destinations';
-
-        let adminAuthBlocked = false;
-        let mainAuthBlocked = false;
+        const MIGRATION_FLAG_PATH = 'simkendis/migrations/bookingsByYearV1';
+        let selectedBookingYear = String(new Date().getFullYear());
+        let knownBookings = new Map();
+        let migrationPromise = null;
+        let cloudReady = false;
         let activeCloudEndpoint = null;
-
-        async function getAdminToken(forceRefresh = false) {
-            if (adminAuthBlocked) return null;
-            try {
-                if (!adminAuth.currentUser) await signInAnonymously(adminAuth);
-                return await adminAuth.currentUser.getIdToken(forceRefresh);
-            } catch (err) {
-                if (/admin-restricted-operation|operation-not-allowed/i.test(String(err?.code || err?.message || ''))) {
-                    adminAuthBlocked = true;
-                }
-                return null;
-            }
-        }
+        let mainAuthBlocked = false;
 
         async function getMainToken(forceRefresh = false) {
             if (mainAuthBlocked) return null;
@@ -2940,24 +2929,50 @@
                 let token = tokenFn ? await tokenFn(false) : null;
                 const buildUrl = (t) => `${baseUrl}/${path}.json${t ? `?auth=${encodeURIComponent(t)}` : ''}`;
                 const payload = JSON.stringify(value ?? []);
-                let response = await fetch(buildUrl(token), {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: payload
-                });
+                let response = await fetch(buildUrl(token), {method:'PUT',headers:{'Content-Type':'application/json'},body:payload});
                 if ((response.status === 401 || response.status === 403) && tokenFn && token) {
-                    response = await fetch(buildUrl(null), {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: payload
-                    });
+                    response = await fetch(buildUrl(null), {method:'PUT',headers:{'Content-Type':'application/json'},body:payload});
                 }
-                if (!response.ok) return { ok: false, status: response.status, error: `HTTP ${response.status}` };
-                const data = await response.json();
-                return { ok: true, status: 200, data };
-            } catch (err) {
-                return { ok: false, status: 0, error: err?.message || String(err) };
-            }
+                if (!response.ok) return {ok:false,status:response.status,error:`HTTP ${response.status}`};
+                return {ok:true,status:200,data:await response.json()};
+            } catch(err) { return {ok:false,status:0,error:err?.message||String(err)}; }
+        }
+
+        async function migrateLegacyBookingsOnce() {
+            if (migrationPromise) return migrationPromise;
+            migrationPromise = (async()=>{
+                const flag = await get(ref(mainDb,MIGRATION_FLAG_PATH));
+                if (flag.exists() && flag.val()===true) return;
+                const legacy = await get(ref(mainDb,BOOKING_PATH));
+                if (legacy.exists()) {
+                    const grouped = new Map();
+                    for (const record of normalizeBookingsList(legacy.val())) {
+                        const year = String(record.tanggal||'').match(/^(20\d{2})/)?.[1] || String(new Date().getFullYear());
+                        if (!grouped.has(year)) grouped.set(year,{});
+                        grouped.get(year)[record.id]=record;
+                    }
+                    for (const [year,records] of grouped) {
+                        await runTransaction(ref(mainDb,`${BOOKINGS_BY_YEAR_PATH}/${year}`),current=>({...records,...((current&&typeof current==='object')?current:{})}),{applyLocally:false});
+                    }
+                }
+                await set(ref(mainDb,MIGRATION_FLAG_PATH),true);
+            })().catch(err=>{migrationPromise=null;throw err;});
+            return migrationPromise;
+        }
+
+        function recordYear(record) { return String(record?.tanggal||'').match(/^(20\d{2})/)?.[1] || selectedBookingYear; }
+
+        async function writeRecordSafely(year,id,record,baseRevision=0) {
+            const target=ref(mainDb,`${BOOKINGS_BY_YEAR_PATH}/${year}/${id}`);
+            const stamp=new Date().toISOString();
+            const result=await runTransaction(target,current=>{
+                const currentRevision=Number(current?._revision)||0;
+                if (currentRevision !== Number(baseRevision||0)) return;
+                if (record) return {...sanitizeForFirebase(record),_revision:currentRevision+1};
+                return {_deleted:true,id,tanggal:`${year}-01-01`,updatedAt:stamp,_revision:currentRevision+1};
+            },{applyLocally:false});
+            if(!result.committed) return {ok:false,error:'Konflik data: record telah diubah atau dihapus admin lain. Muat ulang tahun ini sebelum mengedit lagi.'};
+            return {ok:true,value:result.snapshot.val()};
         }
 
         window.SIMKENDIS_DESTINATIONS = {
@@ -2972,47 +2987,11 @@
                 const id = 'dst_'+cleanName.toLowerCase().replace(/[^a-z0-9]+/g,'_').slice(0,45);
                 const toSave = { ...item, id, name: cleanName, km: Number(item.km), updatedAt: new Date().toISOString() };
                 const cloudPayload = { ...toSave }; delete cloudPayload.id;
-                await restWriteSafe(SIMKENDIS_CONFIG.databaseURL, `${DEST_PATH}/${id}`, cloudPayload, getMainToken);
-                return toSave;
+                const result = await restWriteSafe(SIMKENDIS_CONFIG.databaseURL, `${DEST_PATH}/${id}`, cloudPayload, getMainToken);
+                if (!result.ok) return {ok:false,error:result.error};
+                return {ok:true,...toSave};
             }
         };
-
-        function parseAdminMaster(raw, kind) {
-            if (!raw || typeof raw !== 'object') return [];
-            return Object.entries(raw).filter(([,v])=>v && typeof v==='object').map(([key,v]) => {
-                if (kind==='vehicle') {
-                    const plate = String(v.plate || v.nopol || '').trim();
-                    const model = String(v.model || v.name || v.nama || '').trim();
-                    const name = [model, plate && !model.toUpperCase().includes(plate.toUpperCase()) ? `(${plate})` : ''].filter(Boolean).join(' ').trim();
-                    return {
-                        id: String(v.id || key), _fbKey: key, name: name || plate || model || key,
-                        plate, model, ratio: Number(v.ratio || v.efficiency || v.kmPerLiter) || 10,
-                        fuel: /diesel|solar|dex/i.test(String(v.fuel || v.jenisBBM || '')) ? 'dexlite' : 'pertamax',
-                        isActive: v.isActive !== false && String(v.status || 'ON').toUpperCase() !== 'OFF'
-                    };
-                }
-                return {
-                    id: String(v.id || v._fbKey || key), _fbKey: key,
-                    name: String(v.name || v.nama || v.driver || '').trim(),
-                    phone: String(v.phone || v.cp || v.contact || '').trim(),
-                    isActive: v.isActive !== false && String(v.status || 'ON').toUpperCase() !== 'OFF'
-                };
-            }).filter(x=>x.name);
-        }
-
-        (async () => {
-            try {
-                const [vehiclesRes, driversRes] = await Promise.all([
-                    restReadSafe(ADMINAUTO_CONFIG.databaseURL, `${ADMINAUTO_ROOT}/vehicles`, getAdminToken),
-                    restReadSafe(ADMINAUTO_CONFIG.databaseURL, `${ADMINAUTO_ROOT}/drivers`, getAdminToken)
-                ]);
-                const vehicles = vehiclesRes.ok ? parseAdminMaster(vehiclesRes.data, 'vehicle') : [];
-                const drivers = driversRes.ok ? parseAdminMaster(driversRes.data, 'driver') : [];
-                if (vehicles.length) {
-                    window.dispatchEvent(new CustomEvent('adminauto-master-loaded', {detail:{vehicles,drivers}}));
-                }
-            } catch (err) {}
-        })();
 
         let ready = false;
         let writeChain = Promise.resolve();
@@ -3065,66 +3044,56 @@
             return values.map(normalizeBookingRecord).filter(v => v && v.id);
         }
 
-        async function loadBookingsFromCloud() {
-            const mainToken = await getMainToken(false);
-            if (mainToken) {
-                try {
-                    const snap = await get(ref(mainDb, BOOKING_PATH));
-                    activeCloudEndpoint = { baseUrl: SIMKENDIS_CONFIG.databaseURL, path: BOOKING_PATH, tokenFn: getMainToken, label: 'fleet-transaction-management (SDK)' };
-                    return { ok: true, data: snap.exists() ? normalizeBookingsList(snap.val()) : [], source: activeCloudEndpoint.label };
-                } catch (_) {}
-            }
-            for (const path of MAIN_ALT_PATHS) {
-                const res = await restReadSafe(SIMKENDIS_CONFIG.databaseURL, path, getMainToken);
-                if (res.ok) {
-                    activeCloudEndpoint = { baseUrl: SIMKENDIS_CONFIG.databaseURL, path, tokenFn: getMainToken, label: `fleet-transaction-management (${path})` };
-                    return { ok: true, data: normalizeBookingsList(res.data), source: activeCloudEndpoint.label };
-                }
-            }
-            for (const path of FALLBACK_ALT_PATHS) {
-                const res = await restReadSafe(ADMINAUTO_CONFIG.databaseURL, path, getAdminToken);
-                if (res.ok) {
-                    activeCloudEndpoint = { baseUrl: ADMINAUTO_CONFIG.databaseURL, path, tokenFn: getAdminToken, label: `uns-fleet-service (${path})` };
-                    return { ok: true, data: normalizeBookingsList(res.data), source: activeCloudEndpoint.label };
-                }
-            }
-            return { ok: false, status: 401, error: 'Semua jalur baca ditolak.' };
+        async function loadBookingsFromCloud(year = selectedBookingYear) {
+            try {
+                await migrateLegacyBookingsOnce();
+                const snap=await get(ref(mainDb,`${BOOKINGS_BY_YEAR_PATH}/${year}`));
+                const raw=snap.exists()?snap.val():{};
+                const data=normalizeBookingsList(Object.values(raw||{}).filter(v=>v&&v._deleted!==true));
+                selectedBookingYear=String(year);
+                knownBookings=new Map(data.map(b=>[String(b.id),structuredClone(b)]));
+                activeCloudEndpoint={baseUrl:SIMKENDIS_CONFIG.databaseURL,path:`${BOOKINGS_BY_YEAR_PATH}/${year}`,label:`fleet-transaction-management (${year})`};
+                return {ok:true,data,source:activeCloudEndpoint.label};
+            } catch(err) { return {ok:false,error:err?.message||'Gagal membaca database utama.'}; }
         }
 
         async function writeBookingsToCloud(cleanData) {
-            const incoming = Array.isArray(cleanData) ? cleanData : [];
-            const payload = window.sanitizeForFirebase ? window.sanitizeForFirebase(incoming) : incoming;
-
-            let endpoint = activeCloudEndpoint;
-            if (!endpoint) {
-                const check = await loadBookingsFromCloud();
-                if (check.ok) endpoint = activeCloudEndpoint;
+            const incoming=Array.isArray(cleanData)?cleanData:[];
+            const nextMap=new Map(incoming.filter(v=>v&&v.id).map(v=>[String(v.id),v]));
+            const jobs=[];
+            for(const [id,old] of knownBookings.entries()) {
+                const next=nextMap.get(id);
+                if(!next) jobs.push({id,kind:'delete',promise:writeRecordSafely(recordYear(old),id,null,Number(old._revision)||0)});
+                else if(recordYear(old)!==recordYear(next)) {
+                    jobs.push({id,kind:'move-delete',promise:writeRecordSafely(recordYear(old),id,null,Number(old._revision)||0)});
+                }
             }
-            if (!endpoint) {
-                endpoint = { baseUrl: SIMKENDIS_CONFIG.databaseURL, path: BOOKING_PATH, tokenFn: getMainToken, label: 'fleet-transaction-management (REST)' };
+            for(const [id,record] of nextMap.entries()) {
+                const old=knownBookings.get(id);
+                const changed=!old || JSON.stringify(sanitizeForFirebase(old))!==JSON.stringify(sanitizeForFirebase(record));
+                if(changed) jobs.push({id,kind:'write',promise:writeRecordSafely(recordYear(record),id,record,Number(old?._revision)||0)});
             }
-            const res = await restWriteSafe(endpoint.baseUrl, endpoint.path, payload, endpoint.tokenFn);
-            if (res.ok) {
-                return {ok:true, target:endpoint.label};
+            const results=await Promise.all(jobs.map(j=>j.promise));
+            const failed=results.find(x=>!x.ok);
+            if(failed) return {ok:false,code:'RECORD_WRITE_FAILED',error:failed.error};
+            for(let i=0;i<jobs.length;i++) {
+                const job=jobs[i], result=results[i];
+                if(job.kind==='write' && result.value) { const original=nextMap.get(job.id); original._revision=result.value._revision; nextMap.set(job.id,original); }
             }
-            return {ok:false, code:'CLOUD_WRITE_FAILED', error:`Gagal menyimpan ke ${endpoint.label}`};
+            knownBookings=new Map([...nextMap.entries()].map(([id,v])=>[id,structuredClone(v)]));
+            return {ok:true,target:`fleet-transaction-management (${selectedBookingYear}, per-record)`,written:jobs.length};
         }
 
-        async function refreshCloudData() {
-            const result = await loadBookingsFromCloud();
-            if (!result.ok) {
-                window.dispatchEvent(new CustomEvent('simkendis-firebase-status', {detail:{ok:false,message:'Gagal mengambil data Firebase',detail:result.error}}));
+        async function refreshCloudData(year = selectedBookingYear) {
+            cloudReady = false;
+            const result=await loadBookingsFromCloud(year);
+            if(!result.ok) {
+                window.dispatchEvent(new CustomEvent('simkendis-firebase-status',{detail:{ok:false,message:'Gagal mengambil data dari database utama',detail:result.error}}));
                 return {ok:false,error:result.error};
             }
-            let normalized = Array.isArray(result.data) ? result.data : [];
-            const cloudIds = new Set(normalized.filter(v=>v && v.id).map(v=>String(v.id)));
-            const localOnly = startupLocalBookings.filter(v=>v && v.id && !cloudIds.has(String(v.id)));
-            if (localOnly.length) {
-                normalized = [...normalized, ...localOnly];
-                await writeBookingsToCloud(normalized);
-            }
-            window.dispatchEvent(new CustomEvent('simkendis-firebase-bookings-loaded', {detail:normalized}));
-            window.dispatchEvent(new CustomEvent('simkendis-firebase-status', {detail:{ok:true,message:`Data diperbarui dari Firebase (${result.source})`,detail:'Sinkronisasi berhasil.'}}));
+            cloudReady = true;
+            window.dispatchEvent(new CustomEvent('simkendis-firebase-bookings-loaded',{detail:result.data}));
+            window.dispatchEvent(new CustomEvent('simkendis-firebase-status',{detail:{ok:true,message:`Data tahun ${year} diperbarui dari database utama`,detail:'Sinkronisasi berhasil.'}}));
             return {ok:true,source:result.source};
         }
 
@@ -3169,40 +3138,30 @@
 
                 return result.ok;
             },
-            async refresh() { return await refreshCloudData.call(this); },
+            async refresh(year = selectedBookingYear) { return await refreshCloudData(year); },
             saveBookings(data) {
-                const nextOp = writeChain.catch(() => {}).then(async () => {
-                    const res = await writeBookingsToCloud(data);
-                    window.dispatchEvent(new CustomEvent('simkendis-firebase-status', {
-                        detail: {
-                            ok: res.ok,
-                            message: res.ok ? `Tersimpan di Firebase (${res.target})` : 'Tersimpan di Lokal — sinkronisasi Firebase gagal',
-                            detail: res.ok ? 'Sinkronisasi berhasil.' : `${res.code} — ${res.error}`
-                        }
-                    }));
+                const nextOp=writeChain.catch(()=>{}).then(async()=>{
+                    if (!cloudReady) return {ok:false,error:'Database utama masih memuat data. Silakan ulangi setelah sinkronisasi selesai.'};
+                    const res=await writeBookingsToCloud(data);
+                    window.dispatchEvent(new CustomEvent('simkendis-firebase-status',{detail:{ok:res.ok,message:res.ok?`Tersimpan di database utama (${res.target})`:'Sinkronisasi Firebase gagal',detail:res.ok?`${res.written} record diperiksa.`:res.error}}));
                     return res;
                 });
-                writeChain = nextOp;
+                writeChain=nextOp;
                 return nextOp;
             },
             async getSettings() {
-                const r1 = await restReadSafe(SIMKENDIS_CONFIG.databaseURL, SETTINGS_PATH, getMainToken);
-                if (r1.ok) return r1.data;
-                const r2 = await restReadSafe(ADMINAUTO_CONFIG.databaseURL, FALLBACK_SETTINGS_PATH, getAdminToken);
-                return r2.ok ? r2.data : null;
+                const r=await restReadSafe(SIMKENDIS_CONFIG.databaseURL,SETTINGS_PATH,getMainToken);
+                return r.ok?r.data:null;
             },
             async setSettings(data) {
-                const clean = window.sanitizeForFirebase ? window.sanitizeForFirebase(data) : data;
-                const r1 = await restWriteSafe(SIMKENDIS_CONFIG.databaseURL, SETTINGS_PATH, clean, getMainToken);
-                if (r1.ok) return r1.data;
-                const r2 = await restWriteSafe(ADMINAUTO_CONFIG.databaseURL, FALLBACK_SETTINGS_PATH, clean, getAdminToken);
-                return r2.ok ? r2.data : null;
+                const clean=window.sanitizeForFirebase?window.sanitizeForFirebase(data):data;
+                const r=await restWriteSafe(SIMKENDIS_CONFIG.databaseURL,SETTINGS_PATH,clean,getMainToken);
+                return r.ok?r.data:null;
             },
             async saveMasterSettings(masterData) {
-                const existing = await this.getSettings() || {};
-                const merged = {...existing, master: masterData, updatedAt:new Date().toISOString()};
-                const saved = await this.setSettings(merged);
-                return saved === null ? {ok:false} : {ok:true,data:saved};
+                const existing=await this.getSettings()||{};
+                const saved=await this.setSettings({...existing,master:masterData,updatedAt:new Date().toISOString()});
+                return saved===null?{ok:false,error:'Gagal menulis Master Data ke database utama.'}:{ok:true,data:saved};
             },
             async getTelegramUpload(uniqueId) {
                 if (!uniqueId) return null;
@@ -3212,53 +3171,14 @@
             async getIdToken() {
                 let token = await getMainToken(false);
                 if (token) return token;
-                token = await getAdminToken(false);
-                if (token) return token;
                 await new Promise(resolve => setTimeout(resolve, 250));
-                token = await getMainToken(true) || await getAdminToken(true);
-                return token || null;
+                return await getMainToken(true) || null;
             },
             get ready() { return ready; }
         };
 
         window.SIMKENDIS_FIREBASE.init().then(() => { if (typeof loadGeminiSettings === 'function') loadGeminiSettings(); });
     </script>
-    <script>
-        window.addEventListener('adminauto-master-loaded', event => {
-            // Hindari menimpa Master Data jika sudah ada pengaturan resmi tersimpan di cloud SIMKENDIS
-            if (window.__simkendisCloudMasterLoaded) return;
-
-            const {vehicles, drivers} = event.detail;
-            let updated = false;
-
-            if (Array.isArray(vehicles) && vehicles.length) {
-                // Merge cerdas: tambahkan yang belum ada, jangan timpa rasio atau status yang sudah diubah
-                vehicles.forEach(v => {
-                    const exists = masterVehicles.find(mv => mv.name.toLowerCase() === v.name.toLowerCase());
-                    if (!exists) {
-                        masterVehicles.push(v);
-                        updated = true;
-                    }
-                });
-            }
-
-            if (Array.isArray(drivers) && drivers.length) {
-                drivers.forEach(d => {
-                    const exists = masterDrivers.find(md => md.name.toLowerCase() === d.name.toLowerCase());
-                    if (!exists) {
-                        masterDrivers.push(d);
-                        updated = true;
-                    }
-                });
-            }
-
-            if (updated) {
-                applyMasterLocalSettings();
-                renderMaster();
-                calculateBBM();
-                renderTable();
-            }
-        });
-    </script>
+    <!-- Integrasi database sekunder dinonaktifkan: SIMKENDIS menggunakan database utama saja. -->
 </body>
 </html>
