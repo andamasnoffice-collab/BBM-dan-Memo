@@ -2548,7 +2548,18 @@
 
         function setBpu(id,status) {
             const b=bookings.find(x=>x.id===id); if(!b)return;
-            b.bpuStatus=status; persistBookings(); renderTable(); toast('Status BPU diperbarui.');
+            const wasSent = b.bpuStatus === 'Terkirim ke BPU';
+            b.bpuStatus=status;
+            if (status === 'Terkirim ke BPU') {
+                if (!wasSent || !b.bpuSentAt) b.bpuSentAt = new Date().toISOString();
+            } else if (b.bpuSentAt) {
+                // Simpan jejak tanggal kirim sebelumnya meski status dikoreksi.
+                b.bpuLastSentAt = b.bpuSentAt;
+            }
+            persistBookings(); renderTable();
+            toast(status === 'Terkirim ke BPU'
+                ? 'Transaksi dipindahkan ke tab Terkirim ke BPU.'
+                : 'Status BPU diperbarui.');
         }
 
         function resetMemoSourceFilter() { currentMemoSourceFilter = 'ALL'; renderTable(); }
@@ -2568,8 +2579,8 @@
                     return !!b.isCompleted && b.bpuStatus === 'Terkirim ke BPU';
                 }
                 if (currentTab === 'completed') {
-                    // Tab Terselesaikan: semua yang berstatus selesai
-                    return !!b.isCompleted;
+                    // Yang sudah dikirim ke BPU berpindah sepenuhnya ke tab BPU.
+                    return !!b.isCompleted && b.bpuStatus !== 'Terkirim ke BPU';
                 }
                 // Tab Active (Jadwal & Verifikasi): yang belum selesai
                 return !b.isCompleted;
@@ -2598,8 +2609,8 @@
                     // Terkirim ke BPU hanya menampilkan yang sudah selesai dan dikirim ke BPU
                     tabMatch = !!b.isCompleted && b.bpuStatus === 'Terkirim ke BPU';
                 } else if (currentTab === 'completed') {
-                    // Tab Terselesaikan menampilkan semua yang sudah selesai
-                    tabMatch = !!b.isCompleted;
+                    // Yang sudah dikirim ke BPU tidak boleh tampil ganda di Terselesaikan.
+                    tabMatch = !!b.isCompleted && b.bpuStatus !== 'Terkirim ke BPU';
                 } else {
                     // Tab Aktif (Jadwal & Verifikasi) hanya yang belum selesai
                     tabMatch = !b.isCompleted;
