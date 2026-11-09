@@ -78,7 +78,229 @@
                 box-shadow: none !important;
             }
         }
-    </style>
+    
+    /* SIMKENDIS Desktop Layout: visual only; no changes to Firebase/business logic */
+    #booking-table-container { min-width:0; }
+    #booking-table-container > div { overflow-x:auto !important; overflow-y:visible; scrollbar-width:thin; }
+    .simkendis-booking-table { min-width:1500px; width:100%; table-layout:fixed; }
+    .simkendis-booking-table th, .simkendis-booking-table td {
+      vertical-align:top; overflow-wrap:anywhere; word-break:normal;
+    }
+    .simkendis-booking-table button, .simkendis-booking-table a { max-width:100%; white-space:normal; }
+    #master-modal > div, #booking-form-modal > div { min-width:0; }
+    #master-modal .overflow-x-auto, #booking-form-modal .overflow-x-auto { scrollbar-width:thin; }
+    @media (min-width:1024px) {
+      main { max-width:1800px !important; margin-left:auto; margin-right:auto; }
+      #booking-table-container { isolation:isolate; }
+      #booking-table-container .simkendis-booking-table { min-width:1550px; }
+      #master-modal > div { width:min(1080px,calc(100vw - 64px)); max-width:none; }
+      #booking-form-modal > div { width:min(1100px,calc(100vw - 64px)); max-width:none; }
+      #master-modal .flex.gap-2.overflow-x-auto { flex-wrap:wrap; overflow-x:visible; }
+      #booking-list-controls { align-items:flex-start; }
+      #booking-list-controls > .flex { min-width:0; }
+    }
+    @media (min-width:1600px) {
+      .simkendis-booking-table { min-width:0 !important; }
+    }
+    @media (max-width:767px) {
+      .simkendis-booking-table { min-width:1350px; }
+      #booking-form-modal, #master-modal { padding:8px; }
+      #booking-form-modal > div, #master-modal > div { max-height:96dvh; }
+    }
+
+    /* SIMKENDIS Mobile refinement: prevent clipped controls and overlapping panels */
+    html, body { max-width:100%; overflow-x:hidden; }
+    img, input, select, textarea, button { max-width:100%; }
+    #booking-table-container { max-width:100%; }
+    #booking-table-container > div { -webkit-overflow-scrolling:touch; }
+    @media (max-width:767px) {
+      body { font-size:14px; }
+      header > div { padding-left:12px !important; padding-right:12px !important; }
+      header > div > div:first-child { min-width:0; flex:1 1 100%; }
+      header > div > div:first-child h1 { font-size:16px !important; }
+      header > div > div:first-child p { font-size:10px !important; line-height:1.4; }
+      header > div > div:last-child { width:100%; display:grid !important; grid-template-columns:repeat(2,minmax(0,1fr)); gap:7px !important; }
+      #firebase-status-bar { grid-column:1 / -1; justify-content:space-between; min-width:0; }
+      header button { min-height:38px; justify-content:center; padding-left:8px !important; padding-right:8px !important; }
+      main { padding-left:10px !important; padding-right:10px !important; padding-top:12px !important; }
+      main > section:first-child { gap:8px !important; }
+      main > section:first-child > div { padding:12px !important; border-radius:14px !important; }
+      main > section:first-child h2 { font-size:20px !important; }
+      #booking-list-controls { padding:11px !important; align-items:stretch !important; }
+      #booking-list-controls > div { width:100% !important; min-width:0 !important; }
+      #booking-list-controls > div:last-child { display:grid !important; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px !important; }
+      #booking-list-controls select { min-width:0; width:100%; }
+      #booking-list-controls > div:first-child input { width:100%; }
+      #memo-source-tabs { padding:12px !important; }
+      #memo-source-tab-buttons { gap:6px !important; }
+      #memo-source-tab-buttons button { max-width:100%; white-space:normal; }
+      .simkendis-booking-table { min-width:1250px !important; }
+      #booking-table-container { border-radius:12px !important; }
+      #booking-table-container > div { overflow-x:auto !important; }
+      #booking-table-container table th, #booking-table-container table td { padding:9px 7px !important; }
+      #realisasi-panel > div { padding:13px !important; }
+      #realisasi-panel .overflow-x-auto { -webkit-overflow-scrolling:touch; }
+      #booking-form-modal, #master-modal { padding:0 !important; align-items:stretch !important; }
+      #booking-form-modal > div, #master-modal > div {
+        width:100% !important; max-width:none !important; height:100dvh !important;
+        max-height:100dvh !important; margin:0 !important; border-radius:0 !important;
+      }
+      #booking-form-modal > div { display:flex; flex-direction:column; }
+      #booking-form-modal form { padding:13px !important; gap:13px !important; }
+      #booking-form-modal form > div { padding:12px !important; }
+      #booking-form-modal .grid { min-width:0; }
+      #booking-form-modal input, #booking-form-modal select, #booking-form-modal textarea { min-width:0; font-size:14px !important; }
+      #booking-form-modal button { min-height:38px; }
+      #master-modal > div { display:flex; flex-direction:column; }
+      #master-modal > div > div:first-child { padding:13px !important; }
+      #master-modal > div > div:nth-child(2) { padding-left:8px !important; padding-right:8px !important; overflow-x:auto !important; flex-wrap:nowrap !important; }
+      #master-modal > div > div:nth-child(2) button { flex:0 0 auto; white-space:nowrap; }
+      #master-modal > div > div:nth-child(3) { padding:12px !important; }
+      #master-modal table { min-width:520px; }
+      #admin-login-modal > div { width:calc(100vw - 24px) !important; max-width:420px !important; }
+      .overflow-x-auto { -webkit-overflow-scrolling:touch; }
+    }
+    @media (min-width:768px) and (max-width:1023px) {
+      main { padding-left:14px !important; padding-right:14px !important; }
+      header > div { align-items:flex-start; }
+      #booking-list-controls { align-items:stretch; }
+      #booking-list-controls > div:last-child { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); }
+      #booking-form-modal > div, #master-modal > div { width:calc(100vw - 32px); max-width:900px; }
+    }
+
+    
+    /* Fix Master Data mobile: keep header/tabs/footer visible and scroll only the panel body */
+    @media (max-width:767px) {
+      #master-modal {
+        padding:0 !important;
+        align-items:stretch !important;
+        justify-content:stretch !important;
+        overflow:hidden !important;
+        height:100dvh !important;
+      }
+      #master-modal > div {
+        display:flex !important;
+        flex-direction:column !important;
+        width:100% !important;
+        height:100dvh !important;
+        max-height:100dvh !important;
+        min-height:0 !important;
+        margin:0 !important;
+        border-radius:0 !important;
+        overflow:hidden !important;
+      }
+      #master-modal > div > div:first-child {
+        flex:0 0 auto !important;
+        min-height:76px;
+        padding:12px 14px !important;
+      }
+      #master-modal > div > div:nth-child(2) {
+        display:grid !important;
+        grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+        flex:0 0 auto !important;
+        min-height:0 !important;
+        width:100% !important;
+        padding:7px 9px 0 !important;
+        gap:5px !important;
+        overflow:visible !important;
+        white-space:normal !important;
+      }
+      #master-modal > div > div:nth-child(2) button {
+        min-width:0 !important;
+        width:100% !important;
+        min-height:44px !important;
+        padding:8px 5px !important;
+        border-radius:10px 10px 0 0 !important;
+        justify-content:center !important;
+        text-align:center !important;
+        white-space:normal !important;
+        line-height:1.2 !important;
+        font-size:11px !important;
+      }
+      #master-modal > div > div:nth-child(3) {
+        display:block !important;
+        flex:1 1 0 !important;
+        min-height:0 !important;
+        height:auto !important;
+        max-height:none !important;
+        overflow-y:auto !important;
+        overflow-x:hidden !important;
+        overscroll-behavior:contain;
+        -webkit-overflow-scrolling:touch;
+        padding:12px 10px 22px !important;
+      }
+      #master-modal > div > div:nth-child(3) > div {
+        min-width:0 !important;
+      }
+      #master-modal > div > div:nth-child(3) form {
+        min-width:0 !important;
+        padding:12px !important;
+      }
+      #master-modal > div > div:nth-child(3) .overflow-x-auto,
+      #master-modal > div > div:nth-child(3) .border.rounded-xl.overflow-hidden {
+        max-width:100% !important;
+        overflow-x:auto !important;
+        -webkit-overflow-scrolling:touch;
+      }
+      #master-modal > div > div:nth-child(3) table {
+        min-width:570px !important;
+      }
+      #master-modal > div > div:nth-child(4) {
+        flex:0 0 auto !important;
+        position:relative !important;
+        z-index:5 !important;
+        padding:10px 12px calc(10px + env(safe-area-inset-bottom)) !important;
+        gap:8px !important;
+        background:#f8fafc !important;
+      }
+      #master-modal > div > div:nth-child(4) span {
+        font-size:10px !important;
+        line-height:1.3 !important;
+        max-width:52% !important;
+      }
+      #master-modal > div > div:nth-child(4) button {
+        flex:0 0 auto !important;
+        min-height:40px !important;
+      }
+    }
+
+
+    /* Consistent Status & Aksi column on desktop and mobile */
+    .simkendis-booking-table th.simkendis-action-col,
+    .simkendis-booking-table td.simkendis-action-col {
+      width:190px !important;
+      min-width:190px !important;
+      max-width:190px !important;
+      white-space:normal !important;
+      overflow-wrap:normal !important;
+      word-break:normal !important;
+      text-align:center !important;
+    }
+    .simkendis-action-stack { width:100%; min-width:0; display:flex; flex-direction:column; align-items:stretch; gap:7px !important; }
+    .simkendis-action-stack .badge { display:flex; width:100%; min-height:30px; align-items:center; justify-content:center; white-space:normal; line-height:1.25; }
+    .simkendis-action-stack > button { width:100%; min-height:38px; white-space:normal !important; line-height:1.25; padding:8px 7px !important; }
+    .simkendis-action-stack > button span { display:inline; overflow-wrap:normal; word-break:normal; }
+    .simkendis-action-stack select { width:100%; min-width:0; min-height:36px; white-space:normal; }
+    .simkendis-row-actions { display:flex !important; flex-direction:row !important; flex-wrap:nowrap !important; align-items:center; justify-content:center; gap:8px !important; width:100%; }
+    .simkendis-row-actions button { display:inline-flex !important; flex:0 1 auto; align-items:center; justify-content:center; gap:4px; min-width:0; white-space:nowrap !important; word-break:keep-all !important; overflow-wrap:normal !important; font-size:11px !important; }
+    .simkendis-row-actions span { flex:0 0 auto; }
+    @media (max-width:767px) {
+      .simkendis-booking-table th.simkendis-action-col,
+      .simkendis-booking-table td.simkendis-action-col {
+        width:190px !important; min-width:190px !important; max-width:190px !important;
+      }
+      .simkendis-action-stack { gap:8px !important; }
+      .simkendis-action-stack > button { min-height:42px; font-size:12px !important; }
+      .simkendis-row-actions button { font-size:12px !important; }
+    }
+    @media (min-width:768px) {
+      .simkendis-booking-table th.simkendis-action-col,
+      .simkendis-booking-table td.simkendis-action-col {
+        width:200px !important; min-width:200px !important; max-width:200px !important;
+      }
+    }
+
+</style>
 </head>
 <body class="antialiased min-h-screen flex flex-col selection:bg-uns-blue selection:text-white">
 
@@ -289,8 +511,8 @@
 
             <!-- Table Container -->
             <div id="booking-table-container" class="bg-white rounded-2xl shadow-card border border-slate-200/80 overflow-hidden w-full">
-                <div class="w-full overflow-x-auto lg:overflow-x-visible">
-                    <table class="w-full text-left border-collapse text-xs table-fixed">
+                <div class="w-full overflow-x-auto">
+                    <table class="w-full text-left border-collapse text-xs simkendis-booking-table">
                         <thead>
                             <tr class="bg-slate-900 text-white text-[11px] font-bold uppercase tracking-wider border-b border-slate-800">
                                 <th class="py-3 px-2 text-center w-[3%]">No</th>
@@ -301,7 +523,7 @@
                                 <th class="py-3 px-2 text-right w-[11%]">Estimasi BBM & Tol</th>
                                 <th class="py-3 px-2.5 w-[16%]">Realisasi Struk BBM</th>
                                 <th class="py-3 px-2.5 w-[13%]">Memo Perencanaan</th>
-                                <th class="py-3 px-2 text-center w-[7%] no-print">Status & Aksi</th>
+                                <th class="py-3 px-3 text-center no-print simkendis-action-col">Status & Aksi</th>
                             </tr>
                         </thead>
                         <tbody id="table-body" class="divide-y divide-slate-200/80">
@@ -380,7 +602,7 @@
 
     <!-- Dialog Form Modal (Peminjaman Baru / Edit) -->
     <div id="booking-form-modal" class="hidden fixed inset-0 z-[80] bg-slate-950/60 backdrop-blur-sm p-3 sm:p-6 flex items-center justify-center no-print overflow-y-auto" onclick="if(event.target===this) closeBookingFormModal()">
-        <div class="w-full max-w-3xl my-auto bg-white rounded-2xl shadow-2xl border border-slate-200 flex flex-col max-h-[92vh] overflow-hidden animate-fade-in">
+        <div class="w-full max-w-5xl my-auto bg-white rounded-2xl shadow-2xl border border-slate-200 flex flex-col max-h-[92vh] overflow-hidden animate-fade-in">
             <!-- Modal Header -->
             <div class="bg-gradient-to-r from-uns-dark to-uns-navy text-white px-6 py-4 flex items-center justify-between shrink-0">
                 <div class="flex items-center gap-3">
@@ -703,7 +925,7 @@
 
     <!-- Master Data Management Modal -->
     <div id="master-modal" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
-        <div class="bg-white rounded-2xl max-w-3xl w-full overflow-hidden shadow-2xl border border-slate-200 flex flex-col max-h-[90vh] animate-fade-in">
+        <div class="bg-white rounded-2xl max-w-5xl w-full overflow-hidden shadow-2xl border border-slate-200 flex flex-col max-h-[90vh] animate-fade-in">
             <div class="bg-gradient-to-r from-uns-dark to-uns-blue text-white px-6 py-4 flex items-center justify-between">
                 <div class="flex items-center gap-3">
                     <div class="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center text-amber-400">
@@ -991,7 +1213,7 @@
         let savedMaster = safeParse(MASTER_STORAGE_KEY, null);
         masterVehicles = Array.isArray(savedMaster?.vehicles) && savedMaster.vehicles.length ? savedMaster.vehicles : structuredClone(defaultVehicles);
         masterDrivers = Array.isArray(savedMaster?.drivers) && savedMaster.drivers.length ? savedMaster.drivers : structuredClone(defaultDrivers);
-        memoSources = Array.isArray(savedMaster?.memoSources) && savedMaster.memoSources.length ? savedMaster.memoSources : ['Perencanaan', 'Fakultas', 'Unit Kerja'];
+        memoSources = Array.isArray(savedMaster?.memoSources) ? savedMaster.memoSources : ['Perencanaan', 'Fakultas', 'Unit Kerja'];
         fuelPrices = {...fuelPrices, ...(savedMaster?.fuelPrices || {})};
 
         const $ = id => document.getElementById(id);
@@ -1032,18 +1254,20 @@
         }
     }
 
-    function persistBookings() {
+    async function persistBookings() {
         try {
-            const cleanBookings = sanitizeForFirebase(bookings) || [];
-            bookings = cleanBookings;
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(cleanBookings));
-            if (window.SIMKENDIS_FIREBASE) {
-                window.SIMKENDIS_FIREBASE.saveBookings(cleanBookings).then(res => {
-                    if (!res?.ok) toast('Data tersimpan lokal, sinkronisasi database utama gagal: ' + (res?.error || 'periksa koneksi.'), true);
-                }).catch(err => toast('Sinkronisasi database gagal: ' + (err?.message || err), true));
+            if (!window.SIMKENDIS_FIREBASE?.saveBookings) {
+                return {ok:false,error:'Modul Firebase belum siap.'};
             }
-            return true;
-        } catch(e) { toast('Penyimpanan lokal penuh.', true); return false; }
+            const cleanBookings = sanitizeForFirebase(bookings) || [];
+            const result = await window.SIMKENDIS_FIREBASE.saveBookings(cleanBookings);
+            if (!result?.ok) return {ok:false,error:result?.error || 'Firebase tidak mengonfirmasi penyimpanan.'};
+            bookings = cleanBookings;
+            try { localStorage.setItem(STORAGE_KEY, JSON.stringify(cleanBookings)); } catch (_) {}
+            return {ok:true};
+        } catch(e) {
+            return {ok:false,error:e?.message || String(e)};
+        }
     }
 
         document.addEventListener('DOMContentLoaded', () => {
@@ -1069,14 +1293,7 @@
             if (!Array.isArray(e.detail)) return;
             bookings = sanitizeForFirebase(e.detail) || [];
             
-            // Ekstrak dan gabungkan sumber memo dari database bookings yang sudah ada
-            const foundSources = bookings
-                .map(b => String(b.memoDari || b.memoUnitKerja || '').trim())
-                .filter(Boolean);
-            if (foundSources.length) {
-                memoSources = [...new Set([...memoSources, ...foundSources])].sort((a,b)=>a.localeCompare(b,'id-ID'));
-                persistMaster();
-            }
+            // Jangan mengimpor sumber memo dari riwayat booking ke Master Data.
 
             normalizeMemoPaidStatuses();
             try { localStorage.setItem(STORAGE_KEY, JSON.stringify(bookings)); } catch(_){}
@@ -1106,28 +1323,32 @@
         }
     });
 
-    function persistMaster(syncToCloud = true) {
+    async function persistMaster(syncToCloud = true) {
         try {
             const payload = sanitizeForFirebase({vehicles:masterVehicles,drivers:masterDrivers,fuelPrices,memoSources,updatedAt:new Date().toISOString()});
-            localStorage.setItem(MASTER_STORAGE_KEY, JSON.stringify(payload));
-            if (syncToCloud && window.SIMKENDIS_FIREBASE?.saveMasterSettings) {
-                return window.SIMKENDIS_FIREBASE.saveMasterSettings(payload).then(res => {
-                    if (!res?.ok) { toast('Master Data tersimpan lokal, tetapi gagal disinkronkan ke database utama.', true); return false; }
-                    return true;
-                }).catch(err => { toast('Gagal menyinkronkan Master Data: '+(err?.message||err),true); return false; });
+            if (syncToCloud) {
+                if (!window.SIMKENDIS_FIREBASE?.saveMasterSettings) {
+                    return {ok:false,error:'Modul Firebase belum siap.'};
+                }
+                const res = await window.SIMKENDIS_FIREBASE.saveMasterSettings(payload);
+                if (!res?.ok) return {ok:false,error:res?.error || 'Firebase menolak penyimpanan. Periksa koneksi dan Rules.'};
             }
-            return Promise.resolve(true);
-        } catch(e) { return Promise.resolve(false); }
+            // Cache hanya diperbarui setelah cloud mengonfirmasi sukses.
+            localStorage.setItem(MASTER_STORAGE_KEY, JSON.stringify(payload));
+            return {ok:true};
+        } catch(e) {
+            return {ok:false,error:e?.message || String(e)};
+        }
     }
 
-        function saveFuelConfig() {
+        async function saveFuelConfig() {
             const p=Number($('cfg-pertamax').value), d=Number($('cfg-dexlite').value);
             if (!(p>0 && d>0)) return toast('Harga BBM harus lebih besar dari nol.',true);
-            fuelPrices={pertamax:p,dexlite:d}; 
-            persistMaster(true); 
-            calculateBBM(); 
-            renderTable(); 
-            toast('Harga BBM disimpan. Status sinkronisasi ditampilkan terpisah jika terjadi kendala.');
+            const previous=fuelPrices;
+            fuelPrices={pertamax:p,dexlite:d};
+            const result=await persistMaster(true);
+            if(!result.ok){fuelPrices=previous;renderMaster();return toast('Gagal menyimpan harga BBM ke Firebase: '+result.error,true);}
+            calculateBBM(); renderTable(); toast('Harga BBM berhasil disimpan ke Firebase.');
         }
 
         function renderMaster() {
@@ -1142,24 +1363,25 @@
             $('master-vehicles-tbody').innerHTML=masterVehicles.map(v=>`<tr class="${v.isActive===false?'opacity-60 bg-slate-50/50':''} hover:bg-slate-50/80"><td class="p-3 font-semibold text-slate-800">${esc(v.name)}${v.isActive===false?'<span class="ml-2 inline-block text-rose-600 bg-rose-50 border border-rose-200 px-1.5 py-0.2 rounded text-[10px] font-bold">OFF</span>':''}</td><td class="p-3"><select onchange="setVehicleFuel('${esc(v.id)}',this.value)" class="border rounded-lg px-2.5 py-1 bg-white font-medium"><option value="pertamax" ${v.fuel!=='dexlite'?'selected':''}>Pertamax</option><option value="dexlite" ${v.fuel==='dexlite'?'selected':''}>Dexlite / Solar</option></select></td><td class="p-3"><div class="flex items-center gap-1.5"><input type="number" min="1" step="0.5" value="${Number(v.ratio)||10}" onchange="setVehicleRatio('${esc(v.id)}',this.value)" class="w-16 border rounded-lg px-2 py-1 font-bold"><span>km/L</span></div></td><td class="p-3 text-center"><button type="button" onclick="toggleVehicleActive('${esc(v.id)}')" class="px-2.5 py-1 rounded-lg text-xs font-bold ${v.isActive===false?'bg-emerald-50 text-emerald-700 hover:bg-emerald-100':'bg-amber-50 text-amber-700 hover:bg-amber-100'} transition">${v.isActive===false?'Aktifkan':'Matikan'}</button></td></tr>`).join('');
             $('master-drivers-tbody').innerHTML=masterDrivers.map((d,i)=>`<tr class="${d.isActive===false?'opacity-60 bg-slate-50/50':''} hover:bg-slate-50/80"><td class="p-3 text-center text-slate-400 font-bold">${i+1}</td><td class="p-3 font-semibold text-slate-800">${esc(d.name)}${d.isActive===false?'<span class="ml-2 inline-block text-rose-600 bg-rose-50 border border-rose-200 px-1.5 py-0.2 rounded text-[10px] font-bold">OFF</span>':''}</td><td class="p-3 font-mono text-slate-600">${esc(d.phone||'-')}</td><td class="p-3 text-center"><button type="button" onclick="toggleDriverActive('${esc(d.id)}')" class="px-2.5 py-1 rounded-lg text-xs font-bold ${d.isActive===false?'bg-emerald-50 text-emerald-700 hover:bg-emerald-100':'bg-amber-50 text-amber-700 hover:bg-amber-100'} transition">${d.isActive===false?'Aktifkan':'Matikan'}</button></td></tr>`).join('');
             
-            // Gabungkan sumber memo master dengan sumber memo yang ada di riwayat bookings
-            const allKnownSources = [...new Set([
-                ...memoSources,
-                ...bookings.map(b => String(b.memoDari || b.memoUnitKerja || '').trim()).filter(Boolean)
-            ])].sort((a,b)=>a.localeCompare(b,'id-ID'));
+            // Master Data hanya menampilkan sumber memo yang benar-benar terdaftar di master.
+            // Riwayat transaksi lama tidak boleh otomatis mendaftarkan kembali sumber yang telah dihapus.
+            const masterMemoSources = [...new Set(memoSources.map(x => String(x || '').trim()).filter(Boolean))]
+                .sort((a,b)=>a.localeCompare(b,'id-ID'));
 
             const memoSelect=$('memo-dari');
-            if(memoSelect) { 
-                const previous = memoSelect.value || editingBooking?.memoDari || editingBooking?.memoUnitKerja || ''; 
-                memoSelect.innerHTML = allKnownSources.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join(''); 
-                if (previous && allKnownSources.includes(previous)) {
-                    memoSelect.value = previous;
-                } else if (allKnownSources.length) {
-                    memoSelect.value = allKnownSources[0];
-                }
+            if(memoSelect) {
+                const previous = memoSelect.value || editingBooking?.memoDari || editingBooking?.memoUnitKerja || '';
+                // Dropdown transaksi baru hanya berisi master aktif. Saat mengedit transaksi lama,
+                // sumber historisnya ditambahkan sementara agar nilai lama tetap dapat dipertahankan.
+                const selectSources = [...masterMemoSources];
+                if (editingBooking && previous && !selectSources.includes(previous)) selectSources.push(previous);
+                memoSelect.innerHTML = selectSources.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');
+                if (previous && selectSources.includes(previous)) memoSelect.value = previous;
+                else if (masterMemoSources.length) memoSelect.value = masterMemoSources[0];
+                else memoSelect.value = '';
             }
             const memoBody=$('master-memo-tbody');
-            if(memoBody) memoBody.innerHTML=allKnownSources.map((x,i)=>`<tr class="hover:bg-slate-50"><td class="p-3 text-center text-slate-400 font-bold">${i+1}</td><td class="p-3 font-semibold text-slate-800">${esc(x)}</td><td class="p-3 text-center"><button type="button" onclick="deleteMemoSource(${i})" class="text-rose-600 hover:text-rose-700 hover:underline font-bold">Hapus</button></td></tr>`).join('');
+            if(memoBody) memoBody.innerHTML=masterMemoSources.map((x,i)=>`<tr class="hover:bg-slate-50"><td class="p-3 text-center text-slate-400 font-bold">${i+1}</td><td class="p-3 font-semibold text-slate-800">${esc(x)}</td><td class="p-3 text-center"><button type="button" onclick="deleteMemoSource(${i})" class="text-rose-600 hover:text-rose-700 hover:underline font-bold">Hapus</button></td></tr>`).join('');
             
             if(currentSelected && masterVehicles.some(v=>v.name===currentSelected)) {
                 $('kendaraan').value = currentSelected;
@@ -1168,47 +1390,51 @@
             }
         }
 
-        function addMasterVehicle(e) {
+        async function addMasterVehicle(e) {
             e.preventDefault(); const name=$('mv-name').value.trim(), ratio=Number($('mv-ratio').value), fuel=$('mv-fuel').value;
             if(!name||!(ratio>0)) return toast('Nama kendaraan dan efisiensi wajib diisi.',true);
+            const previous=masterVehicles.map(v=>({...v}));
             const duplicate=masterVehicles.find(v=>v.name.toLowerCase()===name.toLowerCase());
             if(duplicate) Object.assign(duplicate,{ratio,fuel,isActive:true});
             else masterVehicles.push({id:uid('V'),name,ratio,fuel,isActive:true});
-            persistMaster(true); renderMaster(); calculateBBM(); e.target.reset(); toast('Data kendaraan disimpan. Sinkronisasi database utama sedang diproses.');
+            const result=await persistMaster(true);
+            if(!result.ok){masterVehicles=previous;renderMaster();return toast('Gagal menyimpan kendaraan ke Firebase: '+result.error,true);}
+            renderMaster(); calculateBBM(); e.target.reset(); toast('Data kendaraan berhasil disimpan ke Firebase.');
         }
 
-        function addMasterDriver(e) {
+        async function addMasterDriver(e) {
             e.preventDefault(); const name=$('md-name').value.trim(), phone=$('md-phone').value.trim();
             if(!name) return;
+            const previous=masterDrivers.map(d=>({...d}));
             const existing = masterDrivers.find(d=>d.name.toLowerCase()===name.toLowerCase());
-            if(existing) {
-                existing.phone = phone || existing.phone;
-                existing.isActive = true;
-            } else {
-                masterDrivers.push({id:uid('D'),name,phone,isActive:true});
-            }
-            persistMaster(true); renderMaster(); e.target.reset(); toast('Data Driver disimpan. Sinkronisasi database utama sedang diproses.');
+            if(existing) { existing.phone = phone || existing.phone; existing.isActive = true; }
+            else masterDrivers.push({id:uid('D'),name,phone,isActive:true});
+            const result=await persistMaster(true);
+            if(!result.ok){masterDrivers=previous;renderMaster();return toast('Gagal menyimpan driver ke Firebase: '+result.error,true);}
+            renderMaster(); e.target.reset(); toast('Data driver berhasil disimpan ke Firebase.');
         }
 
-        function addMemoSource(e) {
+        async function addMemoSource(e) {
             e.preventDefault(); const name=$('memo-source-name').value.trim();
             if(!name) return;
             if(memoSources.some(x=>x.toLocaleLowerCase('id-ID')===name.toLocaleLowerCase('id-ID'))) return toast('Sumber memo sudah ada.',true);
-            memoSources.push(name); memoSources.sort((a,b)=>a.localeCompare(b,'id-ID')); 
-            persistMaster(true); renderMaster(); $('memo-source-name').value=''; toast('Sumber memo disimpan. Sinkronisasi database utama sedang diproses.');
+            const previous=[...memoSources];
+            memoSources.push(name); memoSources.sort((a,b)=>a.localeCompare(b,'id-ID'));
+            const result=await persistMaster(true);
+            if(!result.ok){memoSources=previous;renderMaster();return toast('Gagal menyimpan sumber memo ke Firebase: '+result.error,true);}
+            renderMaster(); $('memo-source-name').value=''; toast(`Sumber memo "${name}" berhasil disimpan ke Firebase.`);
         }
 
-        function deleteMemoSource(index) {
-            const allKnownSources = [...new Set([
-                ...memoSources,
-                ...bookings.map(b => String(b.memoDari || b.memoUnitKerja || '').trim()).filter(Boolean)
-            ])].sort((a,b)=>a.localeCompare(b,'id-ID'));
-            const targetName = allKnownSources[index];
+        async function deleteMemoSource(index) {
+            // Index berasal dari tabel Master Data, jadi target harus diambil dari memoSources saja.
+            const targetName = [...memoSources].sort((a,b)=>a.localeCompare(b,'id-ID'))[index];
             if (!targetName) return;
-
-            memoSources = memoSources.filter(x => x.toLocaleLowerCase('id-ID') !== targetName.toLocaleLowerCase('id-ID'));
-            if (!memoSources.length) memoSources = ['Perencanaan'];
-            persistMaster(true); renderMaster(); toast(`Sumber memo "${targetName}" dihapus. Sinkronisasi database utama sedang diproses.`);
+            const previous=[...memoSources];
+            memoSources = memoSources.filter(x => String(x).toLocaleLowerCase('id-ID') !== String(targetName).toLocaleLowerCase('id-ID'));
+            // Array kosong adalah kondisi sah: semua sumber memo boleh dihapus.
+            const result=await persistMaster(true);
+            if(!result.ok){memoSources=previous;renderMaster();return toast(`Gagal menghapus sumber memo "${targetName}" dari Firebase: ${result.error}`,true);}
+            renderMaster(); toast(`Sumber memo "${targetName}" berhasil dihapus dari Firebase.`);
         }
 
         const SIMKENDIS_ADMIN_PASSWORD = 'SIMKENDIS2026';
@@ -1333,15 +1559,11 @@
             } catch(e) { $('dest-cloud-status').textContent='Database tujuan online belum dapat diakses'; }
         }
 
-        function saveMasterLocalSettings() {
-            try {
-                localStorage.setItem('simkendis_uns_master_overrides_v1', JSON.stringify({
-                    vehicles: masterVehicles.map(v=>({id:v.id,ratio:v.ratio,fuel:v.fuel,isActive:v.isActive!==false})),
-                    drivers: masterDrivers.map(d=>({id:d.id,isActive:d.isActive!==false}))
-                }));
-                persistMaster(true);
-                return true;
-            } catch(e) { return false; }
+        async function saveMasterLocalSettings() {
+            const result = await persistMaster(true);
+            if (!result?.ok) return result || {ok:false,error:'Penyimpanan Firebase gagal.'};
+            try { localStorage.removeItem('simkendis_uns_master_overrides_v1'); } catch (_) {}
+            return {ok:true};
         }
 
         function applyMasterLocalSettings() {
@@ -1353,29 +1575,37 @@
             } catch(e) {}
         }
 
-        function setVehicleRatio(id,value) {
+        async function setVehicleRatio(id,value) {
             const v=masterVehicles.find(x=>x.id===id), ratio=Number(value);
             if(!v || !(ratio>0&&Number.isFinite(ratio))) { renderMaster(); return; }
-            v.ratio=ratio; saveMasterLocalSettings();calculateBBM();renderTable();toast('Efisiensi kendaraan disimpan.');
+            const old=Number(v.ratio); v.ratio=ratio;
+            const r=await saveMasterLocalSettings();
+            if(!r.ok){v.ratio=old;renderMaster();return toast('Gagal menyimpan efisiensi ke Firebase: '+r.error,true);}
+            calculateBBM();renderTable();toast('Efisiensi kendaraan berhasil disimpan ke Firebase.');
         }
 
-        function setVehicleFuel(id,value) {
+        async function setVehicleFuel(id,value) {
             const v=masterVehicles.find(x=>x.id===id);if(!v||!['pertamax','dexlite'].includes(value))return;
-            v.fuel=value;saveMasterLocalSettings();calculateBBM();toast('Jenis BBM kendaraan disimpan.');
+            const old=v.fuel;v.fuel=value;
+            const r=await saveMasterLocalSettings();
+            if(!r.ok){v.fuel=old;renderMaster();return toast('Gagal menyimpan jenis BBM ke Firebase: '+r.error,true);}
+            calculateBBM();toast('Jenis BBM kendaraan berhasil disimpan ke Firebase.');
         }
 
-        function toggleVehicleActive(id) {
+        async function toggleVehicleActive(id) {
             const v=masterVehicles.find(x=>x.id===id);if(!v)return;
-            v.isActive=v.isActive===false;
-            saveMasterLocalSettings();renderMaster();calculateBBM();
-            toast(`${v.name}: ${v.isActive?'ON':'OFF'}.`);
+            const old=v.isActive;v.isActive=v.isActive===false;
+            const r=await saveMasterLocalSettings();
+            if(!r.ok){v.isActive=old;renderMaster();return toast('Gagal mengubah status kendaraan di Firebase: '+r.error,true);}
+            renderMaster();calculateBBM();toast(`Status kendaraan ${v.name} berhasil disimpan ke Firebase (${v.isActive?'ON':'OFF'}).`);
         }
 
-        function toggleDriverActive(id) {
+        async function toggleDriverActive(id) {
             const d=masterDrivers.find(x=>x.id===id);if(!d)return;
-            d.isActive=d.isActive===false;
-            saveMasterLocalSettings();renderMaster();
-            toast(`${d.name}: ${d.isActive?'ON':'OFF'}.`);
+            const old=d.isActive;d.isActive=d.isActive===false;
+            const r=await saveMasterLocalSettings();
+            if(!r.ok){d.isActive=old;renderMaster();return toast('Gagal mengubah status driver di Firebase: '+r.error,true);}
+            renderMaster();toast(`Status driver ${d.name} berhasil disimpan ke Firebase (${d.isActive?'ON':'OFF'}).`);
         }
 
         function calculateBBM() {
@@ -1445,18 +1675,19 @@
                 scanMemoEnabled: $('gemini-scan-memo')?.checked !== false,
                 updatedAt: new Date().toISOString()
             };
-            simkendisAiSettings = { ...next, directApiKey: directKey };
+            const previousSettings = simkendisAiSettings;
             try {
-                localStorage.setItem(AI_LOCAL_STORAGE_KEY, JSON.stringify(simkendisAiSettings));
-            } catch (_) {}
-            try {
-                const all = await window.SIMKENDIS_FIREBASE?.getSettings?.() || {};
-                await window.SIMKENDIS_FIREBASE?.setSettings?.({ ...all, ai: next });
-                setGeminiStatus(`Pengaturan AI disimpan (${normalizedModel}).`);
-                toast('Pengaturan AI berhasil disimpan.');
+                if (!window.SIMKENDIS_FIREBASE?.saveAiSettings) throw new Error('Fungsi penyimpanan AI Firebase belum tersedia.');
+                const result = await window.SIMKENDIS_FIREBASE.saveAiSettings(next);
+                if (!result?.ok) throw new Error(result?.error || 'Firebase tidak mengonfirmasi penyimpanan.');
+                simkendisAiSettings = { ...next, directApiKey: directKey };
+                try { localStorage.setItem(AI_LOCAL_STORAGE_KEY, JSON.stringify(simkendisAiSettings)); } catch (_) {}
+                setGeminiStatus(`Pengaturan AI berhasil disimpan ke Firebase (${normalizedModel}).`);
+                toast('Pengaturan AI berhasil disimpan ke Firebase.');
             } catch (e) {
-                setGeminiStatus(`Pengaturan disimpan di browser ini (${normalizedModel}).`);
-                toast('Pengaturan AI disimpan di browser ini.');
+                simkendisAiSettings = previousSettings;
+                setGeminiStatus(`Gagal menyimpan ke Firebase: ${e.message || e}`, true);
+                toast('Gagal menyimpan pengaturan AI ke Firebase: '+(e.message||e), true);
             }
         }
 
@@ -1935,11 +2166,16 @@
                 tempUploads.memoDataUrl = null;
                 tempUploads.memoLocalDataUrl = null;
                 const old = bookings.find(b => b.id === $('edit-id').value);
-                if (old) { old.memoDataUrl = null; persistBookings(); renderTable(); renderRealisasi(); }
+                if (old) {
+                    const previous=old.memoDataUrl; old.memoDataUrl=null;
+                    const saved=await persistBookings();
+                    if(!saved.ok){old.memoDataUrl=previous;throw new Error(saved.error);}
+                    renderTable(); renderRealisasi();
+                }
                 $('label-file-memo').textContent = 'Unggah Scan/Foto Memo Perencanaan';
                 updateMemoAttachmentPreview(null);
                 const input = $('file-memo'); if (input) input.value = '';
-                toast('Lampiran memo berhasil dihapus.');
+                toast('Lampiran memo berhasil dihapus dan perubahan tersimpan di Firebase.');
             } catch (err) { toast('Penghapusan gagal: ' + (err.message || err), true); }
         }
 
@@ -2176,7 +2412,7 @@
             if($('total-realisasi-display')) $('total-realisasi-display').textContent=rupiah(total);
         }
 
-        function handleFormSubmit(e) {
+        async function handleFormSubmit(e) {
             e.preventDefault();
             const id=$('edit-id').value, date=$('tanggal').value, borrower=$('peminjam').value.trim(), vehicle=$('kendaraan').value, driver=$('driver').value.trim();
             const dateEnd=$('tanggal-selesai').value;
@@ -2245,10 +2481,12 @@
                 bpuStatus:old?.bpuStatus||'Belum Dikirim',
                 updatedAt:new Date().toISOString()
             };
+            const previousBookings = bookings.map(b=>({...b}));
             if(id) bookings=bookings.map(b=>b.id===id?record:b); else bookings.unshift(record);
-            if(!persistBookings()) return;
+            const saved = await persistBookings();
+            if(!saved.ok) { bookings=previousBookings; renderTable(); renderRealisasi(); return toast('Gagal menyimpan peminjaman ke Firebase: '+saved.error,true); }
             resetForm(); renderTable(); renderRealisasi();
-            toast(id?'Perubahan peminjaman disimpan.':'Peminjaman baru berhasil ditambahkan.');
+            toast(id?'Perubahan peminjaman berhasil disimpan ke Firebase.':'Peminjaman baru berhasil disimpan ke Firebase.');
         }
 
         function setFormUIMode(isEdit = false) {
@@ -2347,7 +2585,12 @@
             $('tipe-perjalanan').value=b.tipePerjalanan||'2.2';
             $('status-struk').value=b.statusStruk||'Belum Ada';
             $('status-memo').value=memoIsEffectivelyPaid(b)?'Sudah Cair':(b.statusMemo||'Belum Diajukan');
-            $('memo-dari').value=memoSources.includes(b.memoDari)?b.memoDari:(memoSources.includes(b.memoUnitKerja)?b.memoUnitKerja:(memoSources[0]||'Perencanaan'));
+            const oldMemoSource=String(b.memoDari||b.memoUnitKerja||'').trim();
+            const memoSelect=$('memo-dari');
+            if(oldMemoSource && memoSelect && ![...memoSelect.options].some(o=>o.value===oldMemoSource)) {
+                memoSelect.add(new Option(oldMemoSource,oldMemoSource));
+            }
+            memoSelect.value=oldMemoSource || memoSources[0] || '';
             $('nominal-memo').value=formatNominalDisplay(b.nominalMemo ?? b.nominal_pengalihan_bbm ?? b.memoFile?.scan?.nominal_pengalihan_bbm ?? 0) || '0';
             $('no-memo').value=b.noMemo||b.nomor_ajuan||b.memoFile?.scan?.nomor_ajuan||'';
             
@@ -2382,25 +2625,31 @@
             openBookingFormModal();
         }
 
-        function deleteBooking(id) {
+        async function deleteBooking(id) {
             const b=bookings.find(x=>x.id===id); if(!b) return;
             if (b.isCompleted && !simkendisAdminMode) { toast('Jadwal Selesai terkunci.', true); return; }
+            const previous=bookings.map(x=>({...x}));
             bookings=bookings.filter(x=>x.id!==id);
-            persistBookings(); renderTable(); renderRealisasi();
-            toast(`Data peminjaman ${b.peminjam} dihapus.`);
+            const saved=await persistBookings();
+            if(!saved.ok){bookings=previous;renderTable();renderRealisasi();return toast('Gagal menghapus peminjaman dari Firebase: '+saved.error,true);}
+            renderTable(); renderRealisasi();
+            toast(`Data peminjaman ${b.peminjam} berhasil dihapus dari Firebase.`);
         }
 
-        function setBookingCompleted(id, completed) {
+        async function setBookingCompleted(id, completed) {
             const b = bookings.find(x => x.id === id); if (!b) return;
             if (b.isCompleted && !completed && !simkendisAdminMode) {
                 toast('Hanya Admin yang dapat membatalkan status Selesai.', true); return;
             }
             if (completed && !b.isCompleted && !confirm('Tandai jadwal ini SELESAI dan pindahkan ke tab Terselesaikan?')) return;
             if (!completed && b.isCompleted && !confirm('Batalkan status Selesai dan kembalikan ke jadwal aktif?')) return;
+            const oldCompleted=b.isCompleted, oldAt=b.completedAt;
             b.isCompleted = !!completed;
             b.completedAt = completed ? new Date().toISOString() : null;
-            persistBookings(); renderTable();
-            toast(completed ? 'Jadwal ditandai Selesai dan dipindahkan.' : 'Status selesai dibatalkan. Jadwal kembali aktif.');
+            const saved=await persistBookings();
+            if(!saved.ok){b.isCompleted=oldCompleted;b.completedAt=oldAt;renderTable();return toast('Gagal menyimpan status jadwal ke Firebase: '+saved.error,true);}
+            renderTable();
+            toast(completed ? 'Status Selesai berhasil disimpan ke Firebase.' : 'Pembatalan status Selesai berhasil disimpan ke Firebase.');
         }
 
         function switchTab(tab) {
@@ -2513,9 +2762,12 @@
             `).join('');
         }
 
-        function setBpu(id,status) {
+        async function setBpu(id,status) {
             const b=bookings.find(x=>x.id===id); if(!b)return;
-            b.bpuStatus=status; persistBookings(); renderTable(); toast('Status BPU diperbarui.');
+            const old=b.bpuStatus;b.bpuStatus=status;
+            const saved=await persistBookings();
+            if(!saved.ok){b.bpuStatus=old;renderTable();return toast('Gagal menyimpan status BPU ke Firebase: '+saved.error,true);}
+            renderTable();toast('Status BPU berhasil disimpan ke Firebase.');
         }
 
         function resetMemoSourceFilter() { currentMemoSourceFilter = 'ALL'; renderTable(); }
@@ -2738,8 +2990,8 @@
                     </td>
 
                     <!-- Status BPU & Aksi -->
-                    <td class="py-3 px-2 no-print text-center">
-                        <div class="space-y-1.5">
+                    <td class="py-3 px-3 no-print text-center simkendis-action-col">
+                        <div class="simkendis-action-stack space-y-1.5">
                             ${b.isCompleted ? `
                                 <div class="badge bg-emerald-100 text-emerald-800 border border-emerald-300 w-full justify-center text-[10px] py-1 shadow-xs">
                                     <i class="fa-solid fa-lock text-[9px]"></i> <span>TERSELESAIKAN</span>
@@ -2751,11 +3003,21 @@
                                         <option value="Terkirim ke BPU" ${b.bpuStatus==='Terkirim ke BPU'?'selected':''}>Terkirim ke BPU</option>
                                     </select>
                                 </div>
-                                ${simkendisAdminMode ? `
+                                ${currentTab === 'completed' ? `
+                                    <div class="grid grid-cols-1 gap-2 pt-1">
+                                        <button type="button" onclick="printCompletedDocument('${b.id}','memo')" ${memoAttachmentOf(b) ? '' : 'disabled'} class="w-full rounded-lg bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-200 disabled:text-slate-400 text-white px-2 py-2 text-[11px] font-bold transition flex items-center justify-center gap-2">
+                                            <i class="fa-solid fa-print"></i><span>Cetak Memo</span>
+                                        </button>
+                                        <button type="button" onclick="printCompletedDocument('${b.id}','struk')" ${(Array.isArray(b.strukList) && b.strukList.some(x=>x && (x.dataUrl||x.driveUrl||x.url||x.webViewLink))) ? '' : 'disabled'} class="w-full rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-200 disabled:text-slate-400 text-white px-2 py-2 text-[11px] font-bold transition flex items-center justify-center gap-2">
+                                            <i class="fa-solid fa-receipt"></i><span>Cetak Struk BBM</span>
+                                        </button>
+                                    </div>
+                                    <span class="text-[9px] text-slate-400 font-medium block">Data terkunci — hanya cetak dokumen</span>
+                                ` : (simkendisAdminMode ? `
                                     <button type="button" onclick="setBookingCompleted('${b.id}',false)" class="w-full rounded-lg bg-amber-500 hover:bg-amber-600 text-white px-2 py-1 text-[10px] font-bold transition flex items-center justify-center gap-1 shadow-xs active:scale-95" title="Batalkan status selesai (Khusus Mode Admin)">
                                         <i class="fa-solid fa-rotate-left text-[9px]"></i> <span>Batalkan Selesai</span>
                                     </button>
-                                    <div class="flex items-center justify-center gap-2 pt-0.5">
+                                    <div class="simkendis-row-actions flex items-center justify-center gap-2 pt-1">
                                         <button onclick="editBooking('${b.id}')" class="text-uns-blue hover:text-uns-light font-bold text-xs hover:underline flex items-center gap-0.5">
                                             <i class="fa-solid fa-pen-to-square text-[10px]"></i> <span>Edit</span>
                                         </button>
@@ -2766,7 +3028,7 @@
                                     </div>
                                 ` : `
                                     <span class="text-[9px] text-slate-400 font-medium block">Terkunci (Mode Tamu)</span>
-                                `}
+                                `)}
                             ` : `
                                 <div class="badge bg-slate-100 text-slate-600 border border-slate-200 w-full justify-center text-[10px] py-1 mb-1">
                                     <span>Operasional Aktif</span>
@@ -2774,7 +3036,7 @@
                                 <button onclick="setBookingCompleted('${b.id}',true)" class="w-full rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white px-2 py-1.5 text-[11px] font-bold shadow-xs transition flex items-center justify-center gap-1 active:scale-95">
                                     <i class="fa-solid fa-check text-[10px]"></i> <span>Tandai Selesai</span>
                                 </button>
-                                <div class="flex items-center justify-center gap-2 pt-0.5">
+                                <div class="simkendis-row-actions flex items-center justify-center gap-2 pt-1">
                                     <button onclick="editBooking('${b.id}')" class="text-uns-blue hover:text-uns-light font-bold text-xs hover:underline flex items-center gap-0.5">
                                         <i class="fa-solid fa-pen-to-square text-[10px]"></i> <span>Edit</span>
                                     </button>
@@ -2802,6 +3064,208 @@
             $('stat-struk').textContent = `${withReceipt} / ${bookings.length}`;
             const paid = bookings.filter(memoIsEffectivelyPaid).length;
             $('stat-memo').textContent = `${paid} / ${bookings.length}`;
+        }
+
+
+        async function printCompletedDocument(id, type) {
+            const b = bookings.find(x => x.id === id);
+            if (!b || !b.isCompleted) {
+                toast('Cetak hanya tersedia untuk jadwal yang sudah Terselesaikan.', true);
+                return;
+            }
+
+            // Buka tab secara sinkron agar tidak diblokir popup blocker ketika file sedang diambil.
+            const win = window.open('', '_blank');
+            if (!win) {
+                toast('Popup cetak diblokir browser. Izinkan pop-up untuk aplikasi ini.', true);
+                return;
+            }
+            win.document.write('<!doctype html><html><body style="font:16px Arial;padding:24px">Menyiapkan foto dokumen untuk dicetak...</body></html>');
+
+            const safe = value => String(value ?? '').replace(/[&<>"']/g, c => ({
+                '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+            }[c]));
+            const getDriveId = item => {
+                const explicit = item?.driveFileId || item?.fileId || item?.idFile || '';
+                if (explicit) return String(explicit);
+                const raw = String(item?.driveUrl || item?.url || item?.webViewLink || item?.downloadUrl || '');
+                const m = raw.match(/(?:\/d\/|[?&]id=|fileId=)([A-Za-z0-9_-]{10,})/);
+                return m ? m[1] : '';
+            };
+            const driveThumb = id => `https://drive.google.com/thumbnail?id=${encodeURIComponent(id)}&sz=w1600`;
+            const normalizeItem = (x, i) => ({
+                raw: x || {},
+                name: x?.noNota ? `Struk ${x.noNota}` : `Struk BBM ${i+1}`,
+                data: typeof x === 'string' ? x : (x?.dataUrl || x?.localDataUrl || ''),
+                driveId: getDriveId(x),
+                url: typeof x === 'string' ? x : (x?.driveUrl || x?.url || x?.webViewLink || x?.downloadUrl || '')
+            });
+
+            try {
+                let docs = [];
+                if (type === 'memo') {
+                    // Kumpulkan semua lampiran memo yang mungkin berbentuk file tunggal,
+                    // array, atau object map dari struktur transaksi.
+                    const memoNode = b.documents?.memo;
+                    const memoCandidates = [
+                        b.memoDataUrl, b.memoUrl, b.memoURL, b.memoDriveUrl,
+                        b.memoFile, b.memoWebViewLink, b.memoDownloadUrl,
+                        ...(Array.isArray(memoNode) ? memoNode : (memoNode && typeof memoNode === 'object' ? Object.values(memoNode) : [memoNode]))
+                    ].filter(Boolean);
+                    const seenMemo = new Set();
+                    const uniqueMemo = memoCandidates.filter(item => {
+                        const key = String(
+                            item?.fileUniqueId || item?.driveFileId || item?.fileId ||
+                            item?.url || item?.driveUrl || item?.webViewLink ||
+                            (typeof item === 'string' ? item : '')
+                        ).trim();
+                        if (!key || seenMemo.has(key)) return false;
+                        seenMemo.add(key);
+                        return true;
+                    });
+                    docs = uniqueMemo.map(normalizeItem).filter(d => d.data || d.url || d.driveId);
+                    docs.forEach((d,i) => {
+                        d.name = d.raw?.name || d.raw?.fileName || (b.noMemo ? `${b.noMemo}${docs.length>1?' - '+(i+1):''}` : `Memo ${i+1}`);
+                    });
+                } else {
+                    // Gabungkan SEMUA sumber struk; jangan mengutamakan strukList lalu mengabaikan
+                    // dokumen tambahan yang tersimpan di documents.struk.
+                    const listA = Array.isArray(b.strukList) ? b.strukList : [];
+                    const node = b.documents?.struk;
+                    const listB = Array.isArray(node) ? node
+                        : (node && typeof node === 'object' ? Object.values(node) : []);
+                    const combined = [...listA, ...listB];
+                    const seen = new Set();
+                    const unique = combined.filter(item => {
+                        const key = String(
+                            item?.fileUniqueId || item?.driveFileId || item?.fileId ||
+                            item?.url || item?.driveUrl || item?.webViewLink ||
+                            item?.noNota || (typeof item === 'string' ? item : '')
+                        ).trim();
+                        if (!key) return false;
+                        if (seen.has(key)) return false;
+                        seen.add(key);
+                        return true;
+                    });
+                    docs = unique.map(normalizeItem).filter(d => d.data || d.url || d.driveId);
+                }
+
+                if (!docs.length) throw new Error(type === 'memo' ? 'Lampiran memo belum tersedia.' : 'Lampiran struk BBM belum tersedia.');
+
+                // Jika file berasal dari Telegram, cari metadata upload untuk mendapatkan ID/URL Drive.
+                for (const d of docs) {
+                    if (!d.driveId && !d.url && d.raw?.fileUniqueId && window.SIMKENDIS_FIREBASE?.getTelegramUpload) {
+                        const uploaded = await window.SIMKENDIS_FIREBASE.getTelegramUpload(d.raw.fileUniqueId).catch(() => null);
+                        if (uploaded) {
+                            d.raw = {...uploaded, ...d.raw};
+                            d.driveId = getDriveId(uploaded) || getDriveId(d.raw);
+                            d.url = uploaded.driveUrl || uploaded.url || uploaded.webViewLink || d.url;
+                            d.data = uploaded.dataUrl || d.data;
+                        }
+                    }
+                    // Foto Google Drive diambil sebagai data URL (bukan iframe preview).
+                    if (!d.data && d.driveId && typeof fetchDriveFileAsDataUrl === 'function') {
+                        d.data = await fetchDriveFileAsDataUrl(d.driveId).catch(() => null);
+                    }
+                    // Thumbnail Drive menjadi fallback langsung bila konversi CORS tidak tersedia.
+                    if (!d.data && d.driveId) d.data = driveThumb(d.driveId);
+                    if (!d.data && d.url) {
+                        const idFromUrl = getDriveId({url:d.url});
+                        d.data = idFromUrl ? driveThumb(idFromUrl) : d.url;
+                    }
+                }
+
+                if (type === 'struk') docs = docs.filter(d => d.data);
+                if (!docs.length) throw new Error(type === 'memo' ? 'Lampiran memo tidak ditemukan.' : 'Foto struk tidak ditemukan. Periksa driveFileId/driveUrl pada data transaksi.');
+
+                const isPdf = d => /^data:application\/pdf/i.test(d.data || '') || /\.pdf(?:[?#]|$)/i.test(d.url || '') || /pdf/i.test(d.raw?.mimeType || d.raw?.mime_type || '');
+                if (type === 'memo' && docs.length === 1) {
+                    const d = docs[0];
+                    // Untuk PDF/Drive gunakan file asli. Browser mempertahankan jumlah halaman,
+                    // orientasi dan ukuran tiap halaman dari dokumen sumber.
+                    let original = d.data || '';
+                    if (!original && d.driveId) {
+                        original = `https://drive.google.com/uc?export=download&id=${encodeURIComponent(d.driveId)}`;
+                    }
+                    if (!original && d.url) {
+                        const idFromUrl = getDriveId({url:d.url});
+                        original = idFromUrl
+                            ? `https://drive.google.com/uc?export=download&id=${encodeURIComponent(idFromUrl)}`
+                            : d.url;
+                    }
+                    if (original && (isPdf(d) || d.driveId || /drive\.google\.com/i.test(d.url || ''))) {
+                        win.location.href = original;
+                        toast('File memo asli dibuka. Cetak dari penampil dokumen agar jumlah halaman sama dengan file sumber.', false);
+                        return;
+                    }
+                }
+                const renderDoc = (d, cls='') => {
+                    const source = d.data || d.url;
+                    return isPdf(d)
+                        ? `<div class="doc ${cls}"><iframe src="${safe(source)}" title="${safe(d.name)}"></iframe></div>`
+                        : `<div class="doc ${cls}"><img src="${safe(source)}" alt="${safe(d.name)}"></div>`;
+                };
+
+                let body = '';
+                if (type === 'memo') {
+                    // Lampiran gambar dicetak proporsional, satu gambar per halaman.
+                    body = docs.map(d => `<section class="memo-sheet">${renderDoc(d, 'memo-doc')}</section>`).join('');
+                } else {
+                    const pages = [];
+                    const totalSheets = Math.ceil(docs.length / 6);
+                    for (let i=0; i<docs.length; i+=6) {
+                        const sheetNo = Math.floor(i / 6) + 1;
+                        const six=docs.slice(i,i+6);
+                        while(six.length<6) six.push(null);
+                        pages.push(`<section class="struk-sheet" data-sheet="${sheetNo}">
+                            <div class="sheet-counter">Lembar ${sheetNo} / ${totalSheets}</div>
+                            ${six.map((d,slot)=>d
+                                ? `<div class="struk-cell"><div class="cut-label">${safe(d.name)}</div>${renderDoc(d)}</div>`
+                                : `<div class="struk-cell empty-cell"></div>`).join('')}
+                        </section>`);
+                    }
+                    body=pages.join('');
+                }
+
+                win.document.open();
+                win.document.write(`<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+                    <title>${type==='memo'?'Cetak Memo':'Cetak Struk BBM'} - ${safe(b.peminjam||'')}</title>
+                    <style>
+                    *{box-sizing:border-box}html,body{margin:0;padding:0;background:#fff;color:#111;font-family:Arial,sans-serif}
+                    @page{size:210mm 330mm;margin:5mm}
+                    .memo-sheet{width:200mm;height:320mm;margin:0 auto;overflow:hidden;break-after:page;page-break-after:always;break-inside:avoid;page-break-inside:avoid}
+                    .memo-sheet:last-child{break-after:auto;page-break-after:auto}
+                    .memo-doc{height:100%;width:100%}
+                    .doc{width:100%;height:100%;overflow:hidden;display:flex;align-items:center;justify-content:center}
+                    .doc img{display:block;max-width:100%;max-height:100%;width:100%;height:100%;object-fit:contain}
+                    .doc iframe{width:100%;height:100%;border:0}
+                    .struk-sheet{position:relative;width:200mm;height:320mm;margin:0 auto;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:repeat(3,1fr);break-inside:avoid;page-break-inside:avoid;break-after:page;page-break-after:always}
+                    .struk-sheet:last-of-type{break-after:auto;page-break-after:auto}
+                    .sheet-counter{position:absolute;right:1mm;top:-4mm;font-size:6pt;color:#777}
+                    .struk-cell{position:relative;min-width:0;min-height:0;border:1px dashed #777;padding:3mm;overflow:hidden;display:flex;flex-direction:column}
+                    .cut-label{font-size:8pt;font-weight:bold;text-align:center;height:7mm;flex:0 0 7mm;overflow:hidden}
+                    .struk-cell .doc{flex:1;min-height:0}
+                    .struk-cell .doc img{object-fit:contain}
+                    .empty-cell{background:#fff}
+                    @media screen{body{background:#e5e7eb;padding:12px}.memo-sheet,.struk-sheet{background:#fff;box-shadow:0 1px 8px #0002;margin:0 auto 12px}}
+                    </style></head><body>${body}
+                    <script>
+                    (async()=>{
+                        const imgs=[...document.images];
+                        await Promise.all(imgs.map(img=>img.complete?Promise.resolve():new Promise(resolve=>{img.onload=resolve;img.onerror=resolve;})));
+                        const failed=imgs.filter(img=>!img.naturalWidth);
+                        if(failed.length) {
+                            document.body.insertAdjacentHTML('afterbegin','<div style="padding:8px;color:#b91c1c;font:12px Arial">Peringatan: '+failed.length+' foto tidak berhasil dimuat. Periksa izin berbagi Google Drive.</div>');
+                        }
+                        await new Promise(resolve=>setTimeout(resolve,400));
+                        window.focus();window.print();
+                    })();
+                    <\/script></body></html>`);
+                win.document.close();
+            } catch (err) {
+                win.document.body.innerHTML = `<div style="font:16px Arial;padding:24px;color:#b91c1c">${safe(err?.message || 'Gagal menyiapkan dokumen.')}</div>`;
+                toast(err?.message || 'Gagal menyiapkan dokumen untuk dicetak.', true);
+            }
         }
 
         function previewDocs(id,type) {
@@ -3120,8 +3584,10 @@
                         masterDrivers = cloudMaster.drivers;
                         hasMasterUpdate = true;
                     }
-                    if (Array.isArray(cloudMaster.memoSources) && cloudMaster.memoSources.length) {
-                        memoSources = [...new Set([...memoSources, ...cloudMaster.memoSources])].sort((a,b)=>a.localeCompare(b,'id-ID'));
+                    if (Array.isArray(cloudMaster.memoSources)) {
+                        // Firebase adalah sumber utama, termasuk ketika daftar memang kosong.
+                        memoSources = [...new Set(cloudMaster.memoSources.map(x => String(x || '').trim()).filter(Boolean))]
+                            .sort((a,b)=>a.localeCompare(b,'id-ID'));
                         hasMasterUpdate = true;
                     }
 
@@ -3159,9 +3625,13 @@
                 return r.ok?r.data:null;
             },
             async saveMasterSettings(masterData) {
-                const existing=await this.getSettings()||{};
-                const saved=await this.setSettings({...existing,master:masterData,updatedAt:new Date().toISOString()});
-                return saved===null?{ok:false,error:'Gagal menulis Master Data ke database utama.'}:{ok:true,data:saved};
+                try {
+                    const existing=await this.getSettings()||{};
+                    const saved=await this.setSettings({...existing,master:masterData,updatedAt:new Date().toISOString()});
+                    return saved===null?{ok:false,error:'Firebase tidak mengonfirmasi penulisan (cek koneksi, Authentication, dan Rules).'}:{ok:true,data:saved};
+                } catch(err) {
+                    return {ok:false,error:err?.message||String(err)};
+                }
             },
             async getTelegramUpload(uniqueId) {
                 if (!uniqueId) return null;
