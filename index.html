@@ -2934,33 +2934,43 @@
         let cloudReady = false;
         let activeCloudEndpoint = null;
         let mainAuthBlocked = false;
+        let mainTokenPromise = null;
 
         async function getMainToken(forceRefresh = false) {
             if (mainAuthBlocked) return null;
-            try {
-                if (!mainAuth.currentUser) await signInAnonymously(mainAuth);
-                const user = mainAuth.currentUser;
-                if (!user) return null;
-                return await user.getIdToken(forceRefresh);
-            } catch (err) {
-                const code = String(err?.code || '');
-                const message = String(err?.message || err || '');
-                if (/admin-restricted-operation|operation-not-allowed/i.test(code + ' ' + message)) {
-                    mainAuthBlocked = true;
+            if (mainTokenPromise && !forceRefresh) return mainTokenPromise;
+            const pending = (async () => {
+                try {
+                    if (!mainAuth.currentUser) await signInAnonymously(mainAuth);
+                    const user = mainAuth.currentUser;
+                    if (!user) throw new Error('Firebase Anonymous Auth tidak menghasilkan sesi pengguna.');
+                    return await user.getIdToken(!!forceRefresh);
+                } catch (err) {
+                    const code = String(err?.code || '');
+                    const message = String(err?.message || err || '');
+                    if (/admin-restricted-operation|operation-not-allowed/i.test(code + ' ' + message)) mainAuthBlocked = true;
+                    console.error('SIMKENDIS Firebase Auth gagal:', code, message);
+                    return null;
                 }
-                return null;
-            }
+            })();
+            mainTokenPromise = pending;
+            try { return await pending; }
+            finally { if (mainTokenPromise === pending) mainTokenPromise = null; }
         }
 
         async function restReadSafe(baseUrl, path, tokenFn) {
             try {
-                let token = tokenFn ? await tokenFn(false) : null;
-                const buildUrl = (t) => `${baseUrl}/${path}.json?${t ? `auth=${encodeURIComponent(t)}&` : ''}ts=${Date.now()}`;
+                if (!tokenFn) return { ok:false, status:401, error:'Token Firebase wajib tersedia.' };
+                let token = await tokenFn(false);
+                if (!token) return { ok:false, status:401, error:'Firebase belum terautentikasi. Periksa Authentication > Sign-in method > Anonymous.' };
+                const buildUrl = (t) => `${baseUrl}/${path}.json?auth=${encodeURIComponent(t)}&ts=${Date.now()}`;
                 let response = await fetch(buildUrl(token), { cache: 'no-store' });
-                if ((response.status === 401 || response.status === 403) && tokenFn && token) {
-                    response = await fetch(buildUrl(null), { cache: 'no-store' });
+                if (response.status === 401 || response.status === 403) {
+                    token = await tokenFn(true);
+                    if (!token) return { ok:false, status:response.status, error:'Token Firebase ditolak dan gagal diperbarui.' };
+                    response = await fetch(buildUrl(token), { cache: 'no-store' });
                 }
-                if (!response.ok) return { ok: false, status: response.status, error: `HTTP ${response.status}` };
+                if (!response.ok) return { ok: false, status: response.status, error: `HTTP ${response.status}: ${(await response.text()).slice(0,180)}` };
                 const data = await response.json();
                 return { ok: true, status: 200, data };
             } catch (err) {
@@ -2970,14 +2980,19 @@
 
         async function restWriteSafe(baseUrl, path, value, tokenFn) {
             try {
-                let token = tokenFn ? await tokenFn(false) : null;
-                const buildUrl = (t) => `${baseUrl}/${path}.json${t ? `?auth=${encodeURIComponent(t)}` : ''}`;
+                if (!tokenFn) return {ok:false,status:401,error:'Token Firebase wajib tersedia.'};
+                let token = await tokenFn(false);
+                if (!token) return {ok:false,status:401,error:'Firebase belum terautentikasi. Periksa Authentication > Sign-in method > Anonymous.'};
+                const buildUrl = (t) => `${baseUrl}/${path}.json?auth=${encodeURIComponent(t)}`;
                 const payload = JSON.stringify(value ?? []);
-                let response = await fetch(buildUrl(token), {method:'PUT',headers:{'Content-Type':'application/json'},body:payload});
-                if ((response.status === 401 || response.status === 403) && tokenFn && token) {
-                    response = await fetch(buildUrl(null), {method:'PUT',headers:{'Content-Type':'application/json'},body:payload});
+                const send = t => fetch(buildUrl(t), {method:'PUT',headers:{'Content-Type':'application/json'},body:payload});
+                let response = await send(token);
+                if (response.status === 401 || response.status === 403) {
+                    token = await tokenFn(true);
+                    if (!token) return {ok:false,status:response.status,error:'Token Firebase ditolak dan gagal diperbarui.'};
+                    response = await send(token);
                 }
-                if (!response.ok) return {ok:false,status:response.status,error:`HTTP ${response.status}`};
+                if (!response.ok) return {ok:false,status:response.status,error:`HTTP ${response.status}: ${(await response.text()).slice(0,180)}`};
                 return {ok:true,status:200,data:await response.json()};
             } catch(err) { return {ok:false,status:0,error:err?.message||String(err)}; }
         }
@@ -3203,6 +3218,15 @@
 
         window.SIMKENDIS_FIREBASE = {
             async init() {
+                ready = false;
+                const authToken = await getMainToken(false);
+                if (!authToken) {
+                    cloudReady = false;
+                    window.dispatchEvent(new CustomEvent('simkendis-firebase-status', {detail:{
+                        ok:false, message:'Autentikasi Firebase gagal', detail:'Aktifkan Anonymous sign-in pada Firebase Authentication dan periksa API key/proyek.'
+                    }}));
+                    return false;
+                }
                 ready = true;
                 
                 // Prioritaskan pembacaan Master Settings dari Firebase Cloud terlebih dahulu
