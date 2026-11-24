@@ -2923,14 +2923,12 @@
         catch (_) { mainAuth = getAuth(mainApp); }
         const mainDb = getDatabase(mainApp);
 
-        const BOOKING_PATH = 'simkendis/bookings'; // sumber lama untuk migrasi satu kali
+        // Sumber data aktif hanya bookingsByYear. Data legacy/migrasi sengaja tidak dibaca.
         const BOOKINGS_BY_YEAR_PATH = 'simkendis/bookingsByYear';
         const SETTINGS_PATH = 'simkendis/settings';
         const DEST_PATH = 'simkendis/destinations';
-        const MIGRATION_FLAG_PATH = 'simkendis/migrations/bookingsByYearV1';
         let selectedBookingYear = String(new Date().getFullYear());
         let knownBookings = new Map();
-        let migrationPromise = null;
         let cloudReady = false;
         let activeCloudEndpoint = null;
         let mainAuthBlocked = false;
@@ -2995,28 +2993,6 @@
                 if (!response.ok) return {ok:false,status:response.status,error:`HTTP ${response.status}: ${(await response.text()).slice(0,180)}`};
                 return {ok:true,status:200,data:await response.json()};
             } catch(err) { return {ok:false,status:0,error:err?.message||String(err)}; }
-        }
-
-        async function migrateLegacyBookingsOnce() {
-            if (migrationPromise) return migrationPromise;
-            migrationPromise = (async()=>{
-                const flag = await get(ref(mainDb,MIGRATION_FLAG_PATH));
-                if (flag.exists() && flag.val()===true) return;
-                const legacy = await get(ref(mainDb,BOOKING_PATH));
-                if (legacy.exists()) {
-                    const grouped = new Map();
-                    for (const record of normalizeBookingsList(legacy.val())) {
-                        const year = String(record.tanggal||'').match(/^(20\d{2})/)?.[1] || String(new Date().getFullYear());
-                        if (!grouped.has(year)) grouped.set(year,{});
-                        grouped.get(year)[record.id]=record;
-                    }
-                    for (const [year,records] of grouped) {
-                        await runTransaction(ref(mainDb,`${BOOKINGS_BY_YEAR_PATH}/${year}`),current=>({...records,...((current&&typeof current==='object')?current:{})}),{applyLocally:false});
-                    }
-                }
-                await set(ref(mainDb,MIGRATION_FLAG_PATH),true);
-            })().catch(err=>{migrationPromise=null;throw err;});
-            return migrationPromise;
         }
 
         function recordYear(record) { return String(record?.tanggal||'').match(/^(20\d{2})/)?.[1] || selectedBookingYear; }
@@ -3165,7 +3141,8 @@
 
         async function loadBookingsFromCloud(year = selectedBookingYear) {
             try {
-                await migrateLegacyBookingsOnce();
+                // Selalu baca data terbaru langsung dari bookingsByYear/{tahun}.
+                // Tidak ada fallback atau pembacaan simkendis/bookings (legacy).
                 const snap=await get(ref(mainDb,`${BOOKINGS_BY_YEAR_PATH}/${year}`));
                 const raw=snap.exists()?snap.val():{};
                 const data=normalizeBookingsList(Object.values(raw||{}).filter(v=>v&&v._deleted!==true));
