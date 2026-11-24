@@ -36,6 +36,18 @@
           ".read": "auth != null",
           ".write": "auth != null"
         }
+      },
+      "telegramSessions": {
+        "$chatId": {
+          ".read": "auth != null",
+          ".write": "auth != null"
+        }
+      },
+      "telegramUpdates": {
+        "$updateId": {
+          ".read": "auth != null",
+          ".write": "auth != null"
+        }
       }
     }
   }
