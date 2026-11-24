@@ -1,0 +1,42 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "simkendis": {
+      "bookingsByYear": {
+        "$year": {
+          ".read": "auth != null",
+          ".write": false,
+          ".indexOn": [
+            "tanggal",
+            "peminjam",
+            "bpuStatus",
+            "isCompleted"
+          ],
+          "$bookingId": {
+            ".write": "auth != null",
+            ".validate": "newData.hasChildren(['id','tanggal']) && newData.child('id').isString() && newData.child('id').val() == $bookingId && newData.child('tanggal').isString() && newData.child('tanggal').val().length == 10 && (newData.child('_deleted').val() == true || (newData.hasChildren(['peminjam','kendaraan']) && newData.child('peminjam').isString() && newData.child('peminjam').val().length > 0 && newData.child('kendaraan').isString() && newData.child('kendaraan').val().length > 0)) && (!newData.child('nominalMemo').exists() || (newData.child('nominalMemo').isNumber() && newData.child('nominalMemo').val() >= 0)) && (!newData.child('realisasiStruk').exists() || (newData.child('realisasiStruk').isNumber() && newData.child('realisasiStruk').val() >= 0)) && (!newData.child('estimasiBiaya').exists() || (newData.child('estimasiBiaya').isNumber() && newData.child('estimasiBiaya').val() >= 0))"
+          }
+        }
+      },
+      "settings": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      },
+      "destinations": {
+        ".read": "auth != null",
+        ".write": false,
+        "$destId": {
+          ".write": "auth != null",
+          ".validate": "newData.hasChildren(['name','km']) && newData.child('name').isString() && newData.child('name').val().length > 0 && newData.child('km').isNumber() && newData.child('km').val() > 0"
+        }
+      },
+      "telegramUploads": {
+        "$uniqueId": {
+          ".read": "auth != null",
+          ".write": "auth != null"
+        }
+      }
+    }
+  }
+}
